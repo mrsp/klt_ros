@@ -42,7 +42,7 @@ public:
                                    &klt_ros::imageCb, this);
 
         firstImageCb = true;
-        MIN_NUM_FEAT = 500;
+        MIN_NUM_FEAT = 200;
         focal = 570.3422241210938;
         pp.x = 319.5;
         pp.y = 239.5;
@@ -84,21 +84,22 @@ public:
     void featureDetection(cv::Mat img_1, std::vector<cv::Point2f> &points1)
     { //uses FAST as of now, modify parameters as necessary
         
+        /*
         std::vector<cv::KeyPoint> keypoints_1;
         int fast_threshold = 20;
         bool nonmaxSuppression = true;
         cv::FAST(img_1, keypoints_1, fast_threshold, nonmaxSuppression);
         cv::KeyPoint::convert(keypoints_1, points1, std::vector<int>());
-
-        /*
-        int maxCorners = 2000;
+        */
+        
+        int maxCorners = 500;
         double qualityLevel = 0.01;
-        double minDistance = 0;
-        int blockSize = 3;
+        double minDistance = 10;
+        int blockSize = 6;
         bool useHarrisDetector = false;
         double k = 0.04;
         cv::goodFeaturesToTrack(img_1,points1,maxCorners,qualityLevel,minDistance,cv::Mat(),blockSize,useHarrisDetector,k);
-        */
+        
 
     }
 
