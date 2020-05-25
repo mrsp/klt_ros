@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(klt_ros)
 
+
+add_compile_options(-std=c++14 -fopenmp)
+
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -11,9 +14,14 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 ## System dependencies are found with CMake's conventions
- find_package(Boost REQUIRED)
+find_package(Boost REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(OpenCV 3 REQUIRED)
+find_package(teaserpp REQUIRED)
+find_package(OpenMP)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
-find_package( OpenCV 3 REQUIRED )
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -25,7 +33,7 @@ catkin_package(
 INCLUDE_DIRS include
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}  ${teaserpp_INCLUDE_DIRS})
 
 
 
@@ -38,7 +46,9 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
  add_executable(${PROJECT_NAME} src/klt_ros_driver.cpp)
 
 add_dependencies(${PROJECT_NAME} sensor_msgs_gencpp)
+
 target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}
   ${catkin_LIBRARIES}
-  ${OpenCV_LIBS} )
+  ${Eigen3_LIBRARIES}
+  ${OpenCV_LIBS} teaserpp::teaser_registration)

@@ -17,6 +17,9 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/features2d/features2d.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
+#include <eigen3/Eigen/Dense>
+#include <teaser/registration.h>
+
 using namespace std;
 
 class klt_ros
@@ -32,7 +35,8 @@ class klt_ros
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage;
     cv::Mat R_f, t_f, R, t, E;
-
+    teaser::RobustRegistrationSolver::Params tparams;
+    teaser::RobustRegistrationSolver* solver;
 public:
     klt_ros()
         : it_(nh_)
@@ -52,6 +56,39 @@ public:
     {
     }
 
+
+    void initTeaserParams()
+    {
+        tparams.noise_bound =  0.05;
+        tparams.cbar2 = 1;
+        tparams.estimate_scaling = false;
+        tparams.rotation_max_iterations = 100;
+        tparams.rotation_gnc_factor = 1.4;
+        tparams.rotation_estimation_algorithm = teaser::RobustRegistrationSolver::ROTATION_ESTIMATION_ALGORITHM::GNC_TLS;
+        tparams.rotation_cost_threshold = 0.005;
+
+    }
+
+    void estimateAffineTFTeaser(Eigen::Matrix<double,3, Eigen::Dynamic>src,Eigen::Matrix<double,3, Eigen::Dynamic>dst)
+    {
+         // Solve with TEASER++
+        solver = new teaser::RobustRegistrationSolver(tparams);
+
+        solver->solve(src, dst);
+        auto solution = solver->getSolution();
+        std::cout << "Teaser rot:" << std::endl;
+
+        for(int i=0;i<3;i++)
+        {
+            for(int j=0;j<3;j++)
+            {
+                R_f.at<double>(i,j)=solution.rotation(i,j);
+            }
+        }
+        t_f.at<double>(0)=solution.translation(0);
+        t_f.at<double>(1)=solution.translation(1);
+        t_f.at<double>(2)=solution.translation(2);
+    }
     void featureTracking(cv::Mat img_1, cv::Mat img_2, std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2, std::vector<uchar> &status)
     {
 
