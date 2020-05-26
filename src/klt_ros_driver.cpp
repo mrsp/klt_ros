@@ -18,7 +18,7 @@
 #include "opencv2/features2d/features2d.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 #include <eigen3/Eigen/Dense>
-#include <teaser/registration.h>
+#include "teaser/registration.h"
 
 using namespace std;
 
