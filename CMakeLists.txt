@@ -38,9 +38,8 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenCV 3 REQUIRED)
 # find_package(teaserpp REQUIRED)
 
-message(WARNING Aaddsf )
 
-
+find_package(OpenMP)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
@@ -51,11 +50,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 
 
-# catkin_package(
-# INCLUDE_DIRS include
-# )
+ catkin_package(
+ INCLUDE_DIRS include 
+ LIBRARIES ${PROJECT_NAME}
+ CATKIN_DEPENDS roscpp 
+ )
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}  
+include_directories(include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}  
     ${CMAKE_CURRENT_LIST_DIR}/src/teaser
     ${CMAKE_CURRENT_LIST_DIR}/src/pmc
     ${CMAKE_CURRENT_LIST_DIR}/src/
@@ -70,11 +71,12 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS} ${Open
 
 
 ## Declare a C++ executable
- add_executable(${PROJECT_NAME} src/klt_ros_driver.cpp ${teaser_src} ${pmc_src})
-add_dependencies(${PROJECT_NAME} sensor_msgs_gencpp)
+add_executable(${PROJECT_NAME} src/klt_ros_driver.cpp ${teaser_src} ${pmc_src})
+
 
 target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}
   ${catkin_LIBRARIES}
-  ${Eigen3_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
   ${OpenCV_LIBS})
+add_dependencies(${PROJECT_NAME} sensor_msgs_gencpp)

@@ -32,6 +32,7 @@ class klt_ros
     double focal;
     cv::Point2d pp;
     bool firstImageCb;
+    bool trackOn;
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage;
     cv::Mat R_f, t_f, R, t, E;
@@ -50,6 +51,7 @@ public:
         focal = 570.3422241210938;
         pp.x = 319.5;
         pp.y = 239.5;
+        trackOn = false;
     }
 
     ~klt_ros()
@@ -76,7 +78,6 @@ public:
 
         solver->solve(src, dst);
         auto solution = solver->getSolution();
-        std::cout << "Teaser rot:" << std::endl;
 
         for(int i=0;i<3;i++)
         {
@@ -88,6 +89,9 @@ public:
         t_f.at<double>(0)=solution.translation(0);
         t_f.at<double>(1)=solution.translation(1);
         t_f.at<double>(2)=solution.translation(2);
+
+        std::cout << "Teaser " <<R_f<<" "<<t_f<<std::endl;
+
     }
     void featureTracking(cv::Mat img_1, cv::Mat img_2, std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2, std::vector<uchar> &status)
     {
@@ -139,7 +143,36 @@ public:
         
 
     }
+   void trackFeatures()
+   {
+            
+            //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
+            if (prevFeatures.size() < MIN_NUM_FEAT)
+            {
+                //cout << "Number of tracked features reduced to " << prevFeatures.size() << endl;
+                //cout << "trigerring redection" << endl;
+                featureDetection(prevImage, prevFeatures);
+            }
+            featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
+   }
 
+
+   void compute2Dtf(std::vector<cv::Point2f> &points1 , std::vector<cv::Point2f> &points2)
+   {
+        int N =  min(points1.size(),points2.size());
+        Eigen::Matrix<double,3, Eigen::Dynamic> src(3, N);
+        Eigen::Matrix<double,3, Eigen::Dynamic> dst(3, N);
+                 
+        for(size_t i = 0 ; i < N; ++i)
+        {
+            src.col(i) << points1[i].x , points1[i].y, 0.0;
+            dst.col(i) << points2[i].x , points2[i].y, 0.0;
+
+        }
+       
+        estimateAffineTFTeaser(src,dst);
+
+   }
     void imageCb(const sensor_msgs::ImageConstPtr &msg)
     {
         cv_bridge::CvImagePtr cv_ptr;
@@ -170,14 +203,16 @@ public:
             //currImage = cv_ptr->image;
             cvtColor(cv_ptr->image,currImage,cv::COLOR_BGR2GRAY);
 
-            //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
-            if (prevFeatures.size() < MIN_NUM_FEAT)
+            if(trackOn)
             {
-                //cout << "Number of tracked features reduced to " << prevFeatures.size() << endl;
-                //cout << "trigerring redection" << endl;
-                featureDetection(prevImage, prevFeatures);
+                trackFeatures();
             }
-            featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
+            else
+            {
+                featureDetection(currImage, currFeatures);
+                compute2Dtf(currFeatures,prevFeatures);
+            }
+            
 
             //std::cout << " Feat Size " << std::endl;
             //std::cout << currFeatures.size() << std::endl;
