@@ -31,13 +31,14 @@ SET(pmc_src
 )
 
 
+
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV 3 REQUIRED)
-find_package(teaserpp REQUIRED)
+# find_package(teaserpp REQUIRED)
 
-
+message(WARNING Aaddsf )
 
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -50,14 +51,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 
 
-catkin_package(
-INCLUDE_DIRS include
-
-)
+# catkin_package(
+# INCLUDE_DIRS include
+# )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}  
     ${CMAKE_CURRENT_LIST_DIR}/src/teaser
     ${CMAKE_CURRENT_LIST_DIR}/src/pmc
+    ${CMAKE_CURRENT_LIST_DIR}/src/
+    ${EIGEN3_INCLUDE_DIR}
 )
 
 
