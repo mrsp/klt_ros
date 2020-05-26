@@ -120,7 +120,7 @@ void klt_ros::compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Poi
         dst.col(i) << points2[i].x, points2[i].y, 0.0;
     }
 
-    estimateAffineTFTeaser(dst, src);
+    estimateAffineTFTeaser(src, dst);
 }
 void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
 {
@@ -145,6 +145,8 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
         firstImageCb = false;
         R_f = cv::Mat::eye(3, 3, CV_64F);
         t_f = cv::Mat::zeros(3, 1, CV_64F);
+        R = cv::Mat::eye(3, 3, CV_64F);
+        t = cv::Mat::zeros(3, 1, CV_64F);
     }
     else
     {
