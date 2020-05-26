@@ -10,6 +10,7 @@
 #include "opencv2/calib3d/calib3d.hpp"
 #include <eigen3/Eigen/Dense>
 #include "teaser/registration.h"
+using namespace std;
 
 class klt_ros
 {
@@ -21,7 +22,7 @@ class klt_ros
     double focal;
     cv::Point2d pp;
     bool firstImageCb;
-    bool trackOn;
+    bool trackOn, voInitialized;
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage;
     cv::Mat R_f, t_f, R, t, E;

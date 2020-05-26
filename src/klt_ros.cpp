@@ -1,6 +1,6 @@
 #include <klt_ros/klt_ros.h>
 
-klt_ros::klt_ros() : it_(nh_)
+klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
 {
     // Subscrive to input video feed and publish output video feed
     image_sub_ = it_.subscribe("/camera/rgb/image_rect_color", 1,
@@ -12,6 +12,7 @@ klt_ros::klt_ros() : it_(nh_)
     pp.x = 319.5;
     pp.y = 239.5;
     trackOn = false;
+    voInitialized = false;
 }
 
 void klt_ros::initTeaserParams()
@@ -37,12 +38,12 @@ void klt_ros::estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> sr
     {
         for (int j = 0; j < 3; j++)
         {
-            R_f.at<double>(i, j) = solution.rotation(i, j);
+            R.at<double>(i, j) = solution.rotation(i, j);
         }
     }
-    t_f.at<double>(0) = solution.translation(0);
-    t_f.at<double>(1) = solution.translation(1);
-    t_f.at<double>(2) = solution.translation(2);
+    t.at<double>(0) = solution.translation(0);
+    t.at<double>(1) = solution.translation(1);
+    t.at<double>(2) = solution.translation(2);
 
     std::cout << "Teaser " << R_f << " " << t_f << std::endl;
 }
@@ -119,7 +120,7 @@ void klt_ros::compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Poi
         dst.col(i) << points2[i].x, points2[i].y, 0.0;
     }
 
-    estimateAffineTFTeaser(src, dst);
+    estimateAffineTFTeaser(dst, src);
 }
 void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
 {
@@ -161,22 +162,20 @@ void klt_ros::vo()
         if (trackOn)
         {
             trackFeatures();
+             cv::Mat mask;
+            E = cv::findEssentialMat(currFeatures, prevFeatures, focal, pp, cv::RANSAC, 0.999, 1.0, mask);
+
+            cv::recoverPose(E, currFeatures, prevFeatures, R, t, focal, pp, mask);
+            //std::cout << " Rel Vo" << R << " " << t << std::endl;
         }
         else
         {
             featureDetection(currImage, currFeatures);
+
             compute2Dtf(currFeatures, prevFeatures);
         }
 
-        //std::cout << " Feat Size " << std::endl;
-        //std::cout << currFeatures.size() << std::endl;
-
-        //recovering the pose and the essential matrix
-        cv::Mat mask;
-        E = cv::findEssentialMat(currFeatures, prevFeatures, focal, pp, cv::RANSAC, 0.999, 1.0, mask);
-
-        cv::recoverPose(E, currFeatures, prevFeatures, R, t, focal, pp, mask);
-        //std::cout << " Rel Vo" << R << " " << t << std::endl;
+  
 
         if ((t.at<double>(2) > t.at<double>(0)) && (t.at<double>(2) > t.at<double>(1)))
         {

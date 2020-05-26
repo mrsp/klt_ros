@@ -8,19 +8,18 @@
  */
 #include <klt_ros/klt_ros.h>
 
-using namespace std;
 
 int main(int argc, char *argv[])
 {
 
     ros::init(argc, argv, "klt_ros_node");
-
-    klt_ros klt;
+    ros::NodeHandle n;
+    klt_ros klt(n);
     static ros::Rate rate(30);
     while (ros::ok())
     {
-        klt.vo()
-            ros::spinOnce();
+        klt.vo();
+        ros::spinOnce();
         rate.sleep();
     }
     return 0;
