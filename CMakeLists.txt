@@ -71,7 +71,7 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${Open
 
 
 ## Declare a C++ executable
-add_executable(${PROJECT_NAME} src/klt_ros_driver.cpp ${teaser_src} ${pmc_src})
+add_executable(${PROJECT_NAME} src/klt_ros_driver.cpp src/klt_ros.cpp ${teaser_src} ${pmc_src})
 
 
 target_link_libraries(${PROJECT_NAME}
