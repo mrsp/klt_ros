@@ -122,7 +122,7 @@ bool klt_ros::estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynam
                                      std::vector<cv::DMatch> &good_matches)
 {
 
-    solver = new teaser::RobustRegistrationSolver(tparams);
+        solver = new teaser::RobustRegistrationSolver(tparams);
     // Solve with TEASER++
     solver->solve(src, dst);
     
@@ -225,9 +225,6 @@ void klt_ros::show_matches(const cv::Mat &img_1,
                            const std::vector<cv::KeyPoint> keypoints2,
                            const std::vector<cv::DMatch> &good_matches)
 {
-    if(good_matches.size()==0)
-        return ;
-    
     cv::Mat img_matches;
     cv::drawMatches(img_1,keypoints1, 
                     img_2,keypoints2,
@@ -238,13 +235,12 @@ void klt_ros::show_matches(const cv::Mat &img_1,
                     std::vector<char>(), 
                     cv::DrawMatchesFlags::DEFAULT );
     
-//     cv::imshow("Good Matches", img_matches );
-//     cv::waitKey(0);
-
-    char buf[32];
-    sprintf(buf,"/tmp/d/good_matches_%d.png",frame);
-    cv::imwrite(buf, img_matches);
+    cv::imshow("Good Matches", img_matches );
+    cv::waitKey(0);
 }
+
+
+
 
 void klt_ros::trackFeatures()
 {
@@ -285,10 +281,6 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
     std::vector<cv::DMatch> knn_matches;
     knn_simple(points1,points2,prevDescr,currDescr,knn_matches);    
 
-    if(knn_matches.size()<10)
-    {
-        return false;
-    }
 
     Eigen::Matrix<double, 3, Eigen::Dynamic>src(3,knn_matches.size());
     Eigen::Matrix<double, 3, Eigen::Dynamic>dst(3,knn_matches.size());
@@ -299,14 +291,20 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
         int qidx=m.queryIdx;
         int tidx=m.trainIdx;
 
-        cv::KeyPoint p1=points1[qidx];
-        cv::KeyPoint p2=points2[tidx];
+        cv::KeyPoint p1=points1[tidx];
+        cv::KeyPoint p2=points2[qidx];
         
         Eigen::Vector3d v1(p1.pt.x,p1.pt.y,0);
         Eigen::Vector3d v2(p2.pt.x,p2.pt.y,0);        
         
         src.col(i)<<v1;
-        dst.col(i)<<v2;    
+        dst.col(i)<<v2;
+        
+        std::cout<<"Q:"<<knn_matches[i].queryIdx<<" T:"<<knn_matches[i].trainIdx<<std::endl;
+        std::cout<<"\t("<<v1(0)<<','<<v1(1)<<','<<v1(2);
+        std::cout<<"\t("<<v2(0)<<','<<v2(1)<<','<<v2(2)<<std::endl;
+        
+        
     }
 
     std::cout<<"SRC:"<<src.size()<<std::endl;
@@ -349,12 +347,11 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
         if (!voInitialized)
             voInitialized = true;
     }
-    frame++;
 }
 
 void klt_ros::vo()
 {
-    
+
     if (img_inc && voInitialized)
     {
         if (trackOn)
@@ -373,7 +370,7 @@ void klt_ros::vo()
             std::vector<cv::DMatch> good_matches;
             compute2Dtf(prevKeypoints,currKeypoints,prevDescr,currDescr,good_matches);
             
-            show_matches(prevImage,currImage,prevKeypoints,currKeypoints,good_matches);
+            //show_matches(prevImage,currImage,prevKeypoints,currKeypoints,good_matches);
         }
 
   
@@ -402,7 +399,7 @@ void klt_ros::plotFeatures()
         cv::circle(prevImage, prevFeatures[i], 10, cv::Scalar(255.), -1);
     }
 
-    cv::namedWindow("Good Featurse to Track", CV_WINDOW_AUTOSIZE);
+    cv::namedWindow("Good Features to Track", CV_WINDOW_AUTOSIZE);
     cv::imshow("Good Features to Track", prevImage);
     cv::waitKey(0);
 }
