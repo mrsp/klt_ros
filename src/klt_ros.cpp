@@ -1,4 +1,5 @@
 #include <klt_ros/klt_ros.h>
+#include <opencv2/xfeatures2d/nonfree.hpp>
 
 klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
 {
@@ -13,6 +14,55 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
     pp.y = 239.5;
     trackOn = false;
     voInitialized = false;
+    
+    sift = cv::xfeatures2d::SIFT::create();
+    initTeaserParams();
+    solver = new teaser::RobustRegistrationSolver(tparams);
+}
+
+void klt_ros::knn(std::vector<cv::KeyPoint> keypoints1,
+         std::vector<cv::KeyPoint> keypoints2,
+         cv::Mat des1,
+         cv::Mat des2,
+         std::vector<cv::DMatch> &good_matches)
+{
+    cv::Ptr<cv::FlannBasedMatcher> matcher = cv::FlannBasedMatcher::create();
+
+    std::vector< std::vector<cv::DMatch> > knn_matches;
+    matcher->knnMatch( des1, des2, knn_matches, 2 );
+    
+    const float ratio_thresh = 0.7f;
+    for (size_t i = 0; i < knn_matches.size(); i++)
+    {
+        double dist=knn_matches[i][0].distance;
+        if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)      
+        {
+                good_matches.push_back(knn_matches[i][0]);            
+        }
+    }
+}
+
+void klt_ros::knn_simple(std::vector<cv::KeyPoint> keypoints1,
+                         std::vector<cv::KeyPoint> keypoints2,
+                         cv::Mat des1,
+                         cv::Mat des2,
+                         std::vector<cv::DMatch> &good_matches)
+{
+    good_matches.clear();
+    cv::Ptr<cv::FlannBasedMatcher> matcher = cv::FlannBasedMatcher::create();
+
+    std::vector< std::vector<cv::DMatch> > knn_matches;
+    matcher->knnMatch( des1, des2, knn_matches, 2 );
+    
+    //const float max_dist = 100;
+    const float max_dist = 80;
+    for (size_t i = 0; i < knn_matches.size(); i++)
+    {
+        if (knn_matches[i][0].distance < max_dist)      
+        {
+                good_matches.push_back(knn_matches[i][0]);            
+        }
+    }
 }
 
 void klt_ros::initTeaserParams()
@@ -26,14 +76,21 @@ void klt_ros::initTeaserParams()
     tparams.rotation_cost_threshold = 0.005;
 }
 
-void klt_ros::estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> src, Eigen::Matrix<double, 3, Eigen::Dynamic> dst)
+bool klt_ros::estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> src, 
+                                     Eigen::Matrix<double, 3, Eigen::Dynamic> dst,
+                                     std::vector<cv::DMatch> &initial_matches,
+                                     std::vector<cv::DMatch> &good_matches)
 {
-    // Solve with TEASER++
-    solver = new teaser::RobustRegistrationSolver(tparams);
-
+    // Solve with TEASER++    
     solver->solve(src, dst);
     auto solution = solver->getSolution();
 
+    if(!solution.valid)
+    {
+        std::cout<<"Not valid solution"<<std::endl;
+        return false;
+    }
+    
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 3; j++)
@@ -46,7 +103,24 @@ void klt_ros::estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> sr
     t.at<double>(2) = solution.translation(2);
 
     std::cout << "Teaser " << R_f << " " << t_f << std::endl;
+    
+    std::vector<int> inliners=solver->getTranslationInliers();
+    float fitness=(float)inliners.size()/(float)initial_matches.size();
+    std::cout << "Fitness:"<<fitness << std::endl;
+    std::cout << "Inliners size:"<< inliners.size()<<std::endl;
+
+
+    for(int i=0;i<inliners.size();i++)
+    {
+        int inidx=inliners[i];
+        cv::DMatch m=initial_matches[inidx];
+        good_matches.push_back(m);
+    }
+    
+    return true;
+    
 }
+
 void klt_ros::featureTracking(cv::Mat img_1, cv::Mat img_2, std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2, std::vector<uchar> &status)
 {
 
@@ -95,6 +169,37 @@ void klt_ros::featureDetection(cv::Mat img_1, std::vector<cv::Point2f> &points1)
     double k = 0.04;
     cv::goodFeaturesToTrack(img_1, points1, maxCorners, qualityLevel, minDistance, cv::Mat(), blockSize, useHarrisDetector, k);
 }
+
+void klt_ros::siftFeatureDetection(const cv::Mat &img_1, 
+                                   std::vector<cv::KeyPoint> &points1,
+                                   cv::Mat &descriptors1)
+{    
+    sift->detectAndCompute(img_1,cv::noArray(), points1,descriptors1);  
+}
+
+void klt_ros::show_matches(const cv::Mat &img_1,
+                           const cv::Mat &img_2,
+                           const std::vector<cv::KeyPoint> keypoints1,
+                           const std::vector<cv::KeyPoint> keypoints2,
+                           const std::vector<cv::DMatch> &good_matches)
+{
+    cv::Mat img_matches;
+    cv::drawMatches(img_1,keypoints1, 
+                    img_2,keypoints2,
+                    good_matches,
+                    img_matches, 
+                    cv::Scalar::all(-1),
+                    cv::Scalar::all(-1), 
+                    std::vector<char>(), 
+                    cv::DrawMatchesFlags::DEFAULT );
+    
+    cv::imshow("Good Matches", img_matches );
+    cv::waitKey(0);
+}
+
+
+
+
 void klt_ros::trackFeatures()
 {
 
@@ -108,6 +213,7 @@ void klt_ros::trackFeatures()
     featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
 }
 
+/*
 void klt_ros::compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2)
 {
     int N = min(points1.size(), points2.size());
@@ -122,6 +228,40 @@ void klt_ros::compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Poi
 
     estimateAffineTFTeaser(src, dst);
 }
+*/
+
+bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
+                          const std::vector<cv::KeyPoint> &points2,
+                          const cv::Mat &prevDescr,
+                          const cv::Mat &currDescr,
+                          std::vector<cv::DMatch> &good_matches)
+{
+    std::vector<cv::DMatch> knn_matches;
+    knn_simple(points1,points2,prevDescr,currDescr,knn_matches);    
+
+
+    Eigen::Matrix<double, 3, Eigen::Dynamic>src(3,knn_matches.size());
+    Eigen::Matrix<double, 3, Eigen::Dynamic>dst(3,knn_matches.size());
+
+    for (size_t i = 0; i < knn_matches.size(); i++)
+    {
+        cv::DMatch m=knn_matches[i];
+        int qidx=m.queryIdx;
+        int tidx=m.trainIdx;
+
+        cv::KeyPoint p1=points1[tidx];
+        cv::KeyPoint p2=points1[tidx];
+        
+        Eigen::Vector3d v1(p1.pt.x,p1.pt.y,0);
+        Eigen::Vector3d v2(p2.pt.x,p2.pt.y,0);        
+        
+        src.col(i)<<v1;
+        dst.col(i)<<v2;
+    }
+
+    return estimateAffineTFTeaser(src, dst,knn_matches,good_matches);
+}
+
 void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
 {
     cv_bridge::CvImagePtr cv_ptr;
@@ -141,7 +281,8 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
     {
         //prevImage = cv_ptr->image;
         cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
-        featureDetection(prevImage, prevFeatures);
+        siftFeatureDetection(prevImage, prevKeypoints,prevDescr);
+        
         firstImageCb = false;
         R_f = cv::Mat::eye(3, 3, CV_64F);
         t_f = cv::Mat::zeros(3, 1, CV_64F);
@@ -164,7 +305,7 @@ void klt_ros::vo()
         if (trackOn)
         {
             trackFeatures();
-             cv::Mat mask;
+            cv::Mat mask;
             E = cv::findEssentialMat(currFeatures, prevFeatures, focal, pp, cv::RANSAC, 0.999, 1.0, mask);
 
             cv::recoverPose(E, currFeatures, prevFeatures, R, t, focal, pp, mask);
@@ -172,9 +313,12 @@ void klt_ros::vo()
         }
         else
         {
-            featureDetection(currImage, currFeatures);
-
-            compute2Dtf(currFeatures, prevFeatures);
+            //featureDetection(currImage, currFeatures);
+            siftFeatureDetection(currImage, currKeypoints,currDescr);
+            std::vector<cv::DMatch> good_matches;
+            compute2Dtf(prevKeypoints,currKeypoints,prevDescr,currDescr,good_matches);
+            
+            show_matches(prevImage,currImage,prevKeypoints,currKeypoints,good_matches);
         }
 
   

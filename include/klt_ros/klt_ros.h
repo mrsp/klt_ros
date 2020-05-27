@@ -19,6 +19,10 @@ class klt_ros
     image_transport::Subscriber image_sub_;
     vector<uchar> status;
     vector<cv::Point2f> currFeatures, prevFeatures; //vectors to store the coordinates of the feature points
+    
+    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints;
+    cv::Mat prevDescr,currDescr;
+    
     double focal;
     cv::Point2d pp;
     bool firstImageCb;
@@ -29,18 +33,53 @@ class klt_ros
     teaser::RobustRegistrationSolver::Params tparams;
     teaser::RobustRegistrationSolver *solver;
 
+    cv::Ptr<cv::Feature2D> sift;
+    
 public:
     klt_ros(ros::NodeHandle it_);
 
     void initTeaserParams();
-    void estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> src, Eigen::Matrix<double, 3, Eigen::Dynamic> dst);
+  
+    bool estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> src, 
+                                Eigen::Matrix<double, 3, Eigen::Dynamic> dst,
+                                std::vector<cv::DMatch> &initial_matches,
+                                std::vector<cv::DMatch> &good_matches);
+    
     void featureTracking(cv::Mat img_1, cv::Mat img_2, std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2, std::vector<uchar> &status);
 
     void featureDetection(cv::Mat img_1, std::vector<cv::Point2f> &points1);
     void trackFeatures();
 
-    void compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2);
+    //void compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2);
+    bool compute2Dtf(const std::vector<cv::KeyPoint> &points1,
+                          const std::vector<cv::KeyPoint> &points2,
+                          const cv::Mat &prevDescr,
+                          const cv::Mat &currDescr,
+                          std::vector<cv::DMatch> &good_matches);
+    
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
     void vo();
     void plotFeatures();
+    
+    void show_matches(const cv::Mat &img_1,
+                           const cv::Mat &img_2,
+                           const std::vector<cv::KeyPoint> keypoints1,
+                           const std::vector<cv::KeyPoint> keypoints2,
+                           const std::vector<cv::DMatch> &good_matches);
+    
+    void siftFeatureDetection(const cv::Mat &img_1, 
+                              std::vector<cv::KeyPoint> &points1,
+                              cv::Mat &descriptors1);
+    
+    void knn_simple(std::vector<cv::KeyPoint> keypoints1,
+                    std::vector<cv::KeyPoint> keypoints2,
+                    cv::Mat des1,
+                    cv::Mat des2,
+                    std::vector<cv::DMatch> &good_matches);
+    
+    void knn(std::vector<cv::KeyPoint> keypoints1,
+             std::vector<cv::KeyPoint> keypoints2,
+             cv::Mat des1,
+             cv::Mat des2,
+             std::vector<cv::DMatch> &good_matches);
 };
