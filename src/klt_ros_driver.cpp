@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     ros::init(argc, argv, "klt_ros_node");
     ros::NodeHandle n;
     klt_ros klt(n);
-    static ros::Rate rate(30);
+    static ros::Rate rate(100);
     while (ros::ok())
     {
         klt.vo();

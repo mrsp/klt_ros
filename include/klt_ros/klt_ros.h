@@ -25,7 +25,7 @@ class klt_ros
     
     double focal;
     cv::Point2d pp;
-    bool firstImageCb;
+    bool firstImageCb, img_inc;
     bool trackOn, voInitialized;
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage;

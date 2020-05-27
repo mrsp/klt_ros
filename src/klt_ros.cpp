@@ -6,7 +6,8 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
     // Subscrive to input video feed and publish output video feed
     image_sub_ = it_.subscribe("/camera/rgb/image_rect_color", 1,
                                &klt_ros::imageCb, this);
-
+    
+    img_inc = false;
     firstImageCb = true;
     MIN_NUM_FEAT = 200;
     focal = 570.3422241210938;
@@ -118,6 +119,8 @@ bool klt_ros::estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynam
                                      std::vector<cv::DMatch> &initial_matches,
                                      std::vector<cv::DMatch> &good_matches)
 {
+
+        solver = new teaser::RobustRegistrationSolver(tparams);
     // Solve with TEASER++
     solver->solve(src, dst);
     
@@ -274,7 +277,7 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
                           std::vector<cv::DMatch> &good_matches)
 {
     std::vector<cv::DMatch> knn_matches;
-    knn_mutual(points1,points2,prevDescr,currDescr,knn_matches);    
+    knn_simple(points1,points2,prevDescr,currDescr,knn_matches);    
 
 
     Eigen::Matrix<double, 3, Eigen::Dynamic>src(3,knn_matches.size());
@@ -311,7 +314,7 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
 void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
 {
     cv_bridge::CvImagePtr cv_ptr;
-
+    img_inc = true;
     try
     {
         cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
@@ -346,7 +349,8 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
 
 void klt_ros::vo()
 {
-    if (voInitialized)
+
+    if (img_inc && voInitialized)
     {
         if (trackOn)
         {
@@ -382,6 +386,7 @@ void klt_ros::vo()
         std::cout << "VO" << std::endl;
         std::cout << t_f << std::endl;
         std::cout << R_f << std::endl;
+        img_inc = false;
     }
 }
 void klt_ros::plotFeatures()
