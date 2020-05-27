@@ -318,7 +318,7 @@ void klt_ros::vo()
             std::vector<cv::DMatch> good_matches;
             compute2Dtf(prevKeypoints,currKeypoints,prevDescr,currDescr,good_matches);
             
-            show_matches(prevImage,currImage,prevKeypoints,currKeypoints,good_matches);
+            //show_matches(prevImage,currImage,prevKeypoints,currKeypoints,good_matches);
         }
 
   
