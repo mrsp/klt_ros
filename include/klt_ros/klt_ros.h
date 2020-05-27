@@ -40,8 +40,8 @@ public:
 
     void initTeaserParams();
   
-    bool estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> src, 
-                                Eigen::Matrix<double, 3, Eigen::Dynamic> dst,
+    bool estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynamic> &src, 
+                                const Eigen::Matrix<double, 3, Eigen::Dynamic> &dst,
                                 std::vector<cv::DMatch> &initial_matches,
                                 std::vector<cv::DMatch> &good_matches);
     
@@ -82,4 +82,10 @@ public:
              cv::Mat des1,
              cv::Mat des2,
              std::vector<cv::DMatch> &good_matches);
+    
+    void knn_mutual(std::vector<cv::KeyPoint> keypoints1,
+                         std::vector<cv::KeyPoint> keypoints2,
+                         cv::Mat des1,
+                         cv::Mat des2,
+                         std::vector<cv::DMatch> &good_matches);
 };

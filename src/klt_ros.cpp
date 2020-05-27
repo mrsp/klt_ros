@@ -52,7 +52,7 @@ void klt_ros::knn_simple(std::vector<cv::KeyPoint> keypoints1,
     cv::Ptr<cv::FlannBasedMatcher> matcher = cv::FlannBasedMatcher::create();
 
     std::vector< std::vector<cv::DMatch> > knn_matches;
-    matcher->knnMatch( des1, des2, knn_matches, 2 );
+    matcher->knnMatch( des1, des2, knn_matches, 1 );
     
     //const float max_dist = 100;
     const float max_dist = 80;
@@ -60,14 +60,51 @@ void klt_ros::knn_simple(std::vector<cv::KeyPoint> keypoints1,
     {
         if (knn_matches[i][0].distance < max_dist)      
         {
-                good_matches.push_back(knn_matches[i][0]);            
+            good_matches.push_back(knn_matches[i][0]);            
+        }
+    }
+}
+
+bool orderVec (const std::vector<cv::DMatch> &v1,const std::vector<cv::DMatch> &v2) 
+{
+    return v1[0].queryIdx < v2[0].queryIdx;
+}
+
+void klt_ros::knn_mutual(std::vector<cv::KeyPoint> keypoints1,
+                         std::vector<cv::KeyPoint> keypoints2,
+                         cv::Mat des1,
+                         cv::Mat des2,
+                         std::vector<cv::DMatch> &good_matches)
+{
+    good_matches.clear();
+    cv::Ptr<cv::FlannBasedMatcher> matcher = cv::FlannBasedMatcher::create();
+
+    std::vector< std::vector<cv::DMatch> > knn_matches1,knn_matches2;
+    matcher->knnMatch( des1, des2, knn_matches1, 1 );
+    matcher->knnMatch( des2, des1, knn_matches2, 1 );
+    
+    std::sort (knn_matches2.begin(), knn_matches2.end(),orderVec);
+    for (size_t i = 0; i < knn_matches1.size(); i++)
+    {
+        int tidx1=knn_matches1[i][0].trainIdx;
+        int qidx1=knn_matches1[i][0].queryIdx;
+        
+        int qidx2=knn_matches2[tidx1][0].queryIdx;
+        int tidx2=knn_matches2[tidx1][0].trainIdx;
+        
+        
+        std::cout<<tidx1<<" "<<qidx1<<" "<<qidx2<<" "<<tidx2<<std::endl;
+        if (qidx1==tidx2)
+        {
+            
+            good_matches.push_back(knn_matches1[i][0]);            
         }
     }
 }
 
 void klt_ros::initTeaserParams()
 {
-    tparams.noise_bound = 0.05;
+    tparams.noise_bound = 10;
     tparams.cbar2 = 1;
     tparams.estimate_scaling = false;
     tparams.rotation_max_iterations = 100;
@@ -76,13 +113,14 @@ void klt_ros::initTeaserParams()
     tparams.rotation_cost_threshold = 0.005;
 }
 
-bool klt_ros::estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> src, 
-                                     Eigen::Matrix<double, 3, Eigen::Dynamic> dst,
+bool klt_ros::estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynamic> &src, 
+                                     const Eigen::Matrix<double, 3, Eigen::Dynamic> &dst,
                                      std::vector<cv::DMatch> &initial_matches,
                                      std::vector<cv::DMatch> &good_matches)
 {
-    // Solve with TEASER++    
+    // Solve with TEASER++
     solver->solve(src, dst);
+    
     auto solution = solver->getSolution();
 
     if(!solution.valid)
@@ -108,7 +146,6 @@ bool klt_ros::estimateAffineTFTeaser(Eigen::Matrix<double, 3, Eigen::Dynamic> sr
     float fitness=(float)inliners.size()/(float)initial_matches.size();
     std::cout << "Fitness:"<<fitness << std::endl;
     std::cout << "Inliners size:"<< inliners.size()<<std::endl;
-
 
     for(int i=0;i<inliners.size();i++)
     {
@@ -237,7 +274,7 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
                           std::vector<cv::DMatch> &good_matches)
 {
     std::vector<cv::DMatch> knn_matches;
-    knn_simple(points1,points2,prevDescr,currDescr,knn_matches);    
+    knn_mutual(points1,points2,prevDescr,currDescr,knn_matches);    
 
 
     Eigen::Matrix<double, 3, Eigen::Dynamic>src(3,knn_matches.size());
@@ -250,15 +287,24 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
         int tidx=m.trainIdx;
 
         cv::KeyPoint p1=points1[tidx];
-        cv::KeyPoint p2=points1[tidx];
+        cv::KeyPoint p2=points2[qidx];
         
         Eigen::Vector3d v1(p1.pt.x,p1.pt.y,0);
         Eigen::Vector3d v2(p2.pt.x,p2.pt.y,0);        
         
         src.col(i)<<v1;
         dst.col(i)<<v2;
+        
+        std::cout<<"Q:"<<knn_matches[i].queryIdx<<" T:"<<knn_matches[i].trainIdx<<std::endl;
+        std::cout<<"\t("<<v1(0)<<','<<v1(1)<<','<<v1(2);
+        std::cout<<"\t("<<v2(0)<<','<<v2(1)<<','<<v2(2)<<std::endl;
+        
+        
     }
 
+    std::cout<<"SRC:"<<src.size()<<std::endl;
+    std::cout<<"DST:"<<dst.size()<<std::endl;
+    
     return estimateAffineTFTeaser(src, dst,knn_matches,good_matches);
 }
 
@@ -330,7 +376,8 @@ void klt_ros::vo()
         }
 
         prevImage = currImage.clone();
-        prevFeatures = currFeatures;
+        std::swap(prevKeypoints,currKeypoints);
+        std::swap(prevDescr,currDescr);
 
         std::cout << "VO" << std::endl;
         std::cout << t_f << std::endl;
