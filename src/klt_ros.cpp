@@ -277,7 +277,7 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
                           std::vector<cv::DMatch> &good_matches)
 {
     std::vector<cv::DMatch> knn_matches;
-    knn_simple(points1,points2,prevDescr,currDescr,knn_matches);    
+    knn(points1,points2,prevDescr,currDescr,knn_matches);    
 
 
     Eigen::Matrix<double, 3, Eigen::Dynamic>src(3,knn_matches.size());
@@ -289,8 +289,8 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
         int qidx=m.queryIdx;
         int tidx=m.trainIdx;
 
-        cv::KeyPoint p1=points1[tidx];
-        cv::KeyPoint p2=points2[qidx];
+        cv::KeyPoint p1=points1[qidx];
+        cv::KeyPoint p2=points2[tidx];
         
         Eigen::Vector3d v1(p1.pt.x,p1.pt.y,0);
         Eigen::Vector3d v2(p2.pt.x,p2.pt.y,0);        
@@ -298,9 +298,9 @@ bool klt_ros::compute2Dtf(const std::vector<cv::KeyPoint> &points1,
         src.col(i)<<v1;
         dst.col(i)<<v2;
         
-        std::cout<<"Q:"<<knn_matches[i].queryIdx<<" T:"<<knn_matches[i].trainIdx<<std::endl;
-        std::cout<<"\t("<<v1(0)<<','<<v1(1)<<','<<v1(2);
-        std::cout<<"\t("<<v2(0)<<','<<v2(1)<<','<<v2(2)<<std::endl;
+        // std::cout<<"Q:"<<knn_matches[i].queryIdx<<" T:"<<knn_matches[i].trainIdx<<std::endl;
+        // std::cout<<"\t("<<v1(0)<<','<<v1(1)<<','<<v1(2);
+        // std::cout<<"\t("<<v2(0)<<','<<v2(1)<<','<<v2(2)<<std::endl;
         
         
     }
