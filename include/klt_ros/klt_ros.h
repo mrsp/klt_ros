@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/CameraInfo.h
 #include <cv_bridge/cv_bridge.h>
 
 #include "opencv2/video/tracking.hpp"
@@ -8,29 +9,34 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/features2d/features2d.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
+#include "opencv2/xfeatures2d/nonfree.hpp"
+
 #include <eigen3/Eigen/Dense>
 #include "teaser/registration.h"
+
 using namespace std;
 
 class klt_ros
 {
     int frame;
+    int height, width;
+    double k1,k2,k3,t1,t2;
+    double cx, cy, fx, fy;
     ros::NodeHandle nh_;
     image_transport::ImageTransport it_;
     image_transport::Subscriber image_sub_;
     vector<uchar> status;
     vector<cv::Point2f> currFeatures, prevFeatures; //vectors to store the coordinates of the feature points
     
-    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints;
-    cv::Mat prevDescr,currDescr;
+    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints, matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed,
+    cv::Mat prevDescr,currDescr, matched_prevDescr, matched_currDescr;
     
-    double focal;
     cv::Point2d pp;
-    bool firstImageCb, img_inc;
+    bool firstImageCb, firstCameraInfoCb, img_inc;
     bool trackOn, voInitialized;
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage;
-    cv::Mat R_f, t_f, R, t, E;
+    cv::Mat R_f, t_f, R, R_2D, t_2D, t, E;
     teaser::RobustRegistrationSolver::Params tparams;
     teaser::RobustRegistrationSolver *solver;
 
@@ -39,7 +45,8 @@ class klt_ros
 public:
     klt_ros(ros::NodeHandle it_);
 
-    void initTeaserParams();
+    void teaserParams2DTFEstimation();
+    void teaserParams3DTFEstimation();
   
     bool estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynamic> &src, 
                                 const Eigen::Matrix<double, 3, Eigen::Dynamic> &dst,
@@ -51,14 +58,17 @@ public:
     void featureDetection(cv::Mat img_1, std::vector<cv::Point2f> &points1);
     void trackFeatures();
 
-    //void compute2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2);
-    bool compute2Dtf(const std::vector<cv::KeyPoint> &points1,
+    std::vector<cv::KeyPoint> transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation);
+
+    //void estimate2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2);
+    bool estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
                           const std::vector<cv::KeyPoint> &points2,
                           const cv::Mat &prevDescr,
                           const cv::Mat &currDescr,
                           std::vector<cv::DMatch> &good_matches);
     
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
+    void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
     void vo();
     void plotFeatures();
     
