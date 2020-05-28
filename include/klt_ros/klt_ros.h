@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/CameraInfo.h
+#include <sensor_msgs/CameraInfo.h>
 #include <cv_bridge/cv_bridge.h>
 
 #include "opencv2/video/tracking.hpp"
@@ -28,7 +28,7 @@ class klt_ros
     vector<uchar> status;
     vector<cv::Point2f> currFeatures, prevFeatures; //vectors to store the coordinates of the feature points
     
-    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints, matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed,
+    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints, matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
     cv::Mat prevDescr,currDescr, matched_prevDescr, matched_currDescr;
     
     cv::Point2d pp;
@@ -65,13 +65,14 @@ public:
                           const std::vector<cv::KeyPoint> &points2,
                           const cv::Mat &prevDescr,
                           const cv::Mat &currDescr,
-                          std::vector<cv::DMatch> &good_matches);
+                          std::vector<cv::DMatch> &good_matches, 
+                          std::vector<cv::KeyPoint> m_points1, std::vector<cv::KeyPoint> m_points2, std::vector<cv::KeyPoint> m_points1_transformed, cv::Mat m_d1, cv::Mat m_d2);
     
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
     void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
     void vo();
     void plotFeatures();
-    
+    void plotTransformedKeypoints();
     void show_matches(const cv::Mat &img_1,
                            const cv::Mat &img_2,
                            const std::vector<cv::KeyPoint> keypoints1,

@@ -188,8 +188,8 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
 
     m_points1.resize(knn_matches.size());
     m_points2.resize(knn_matches.size());
-    m_d1.resize(knn_matches.size(),prevDescr.cols());
-    m_d2.resize(knn_matches.size(),prevDescr.cols());
+    m_d1 = cv::Mat::zeros(knn_matches.size(),prevDescr.cols,CV_64F);
+    m_d2 = cv::Mat::zeros(knn_matches.size(),prevDescr.cols,CV_64F);
 
     for (size_t i = 0; i < knn_matches.size(); i++)
     {
@@ -221,7 +221,7 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
     {
         for (int j = 0; j < 2; j++)
         {
-            R_2D.at<double>(i, j) = R.at<double>(i, j)
+            R_2D.at<double>(i, j) = R.at<double>(i, j);
         }
     }
     t_2D.at<double>(0) = t.at<double>(0);
@@ -232,15 +232,42 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
     return true; 
 }
 
-std::vector<cv::KeyPoint> klt_ros::transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation)
+std::vector<cv::KeyPoint> klt_ros::transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints, cv::Mat Rotation, cv::Mat Translation)
 {
-    std::vector<cv::KeyPoint> points_transformed;
-    points_transformed.resize(points.size());
+    std::vector<cv::KeyPoint> Keypoints_transformed;
+    Keypoints_transformed.resize(Keypoints.size());
 
-    for (int i = 0; i < points.size(); i++)
+    std::vector<cv::Point2f> points, points_transformed;
+    points.resize(Keypoints.size());
+    
+    cv::Mat tf2d = cv::Mat::eye(3,3,CV_64F);
+
+    for (int i = 0; i < 2; i++)
     {
-        points_transformed[i].pt = Rotation * points[i].pt + Translation;
+        for (int j = 0; j < 2; j++)
+        {
+            tf2d.at<double>(i,j) = Rotation.at<double>(i,j);
+        }
     }
+    tf2d.at<double>(0,2) = Translation.at<double>(0);
+    tf2d.at<double>(1,2) = Translation.at<double>(1);
+
+
+
+    for (int i = 0; i < Keypoints.size(); i++)
+    {
+        points[i] = Keypoints[i].pt;
+    }
+    cv::perspectiveTransform(points,points_transformed,tf2d);
+
+
+    for (int i = 0; i < Keypoints.size(); i++)
+    {
+        Keypoints_transformed[i].pt = points_transformed[i];
+    }
+
+
+    return Keypoints_transformed;
 }
 
 
@@ -425,10 +452,10 @@ void klt_ros::vo()
             std::vector<cv::DMatch> good_matches;
 
             estimate2Dtf(prevKeypoints, currKeypoints, prevDescr, currDescr, 
-            good_matches matched_prevKeypoints, matched_currKeypoints, matched_prevKeypoints_transformed, matched_prevDescr, matched_currDescr);
+            good_matches, matched_prevKeypoints, matched_currKeypoints, matched_prevKeypoints_transformed, matched_prevDescr, matched_currDescr);
 
             plotTransformedKeypoints();
-            show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
+            //show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
 
         }
 
@@ -453,8 +480,8 @@ void klt_ros::plotTransformedKeypoints()
 
     for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
     {
-        cv::circle(currImage, matched_prevKeypoints_transformed[i].pt, 5, cv::Scalar(255.), -1);
-        cv::circle(currImage, matched_currKeypoints[i].pt, 5, cv::Scalar(0.0), -1);
+        cv::circle(currImage, matched_prevKeypoints_transformed[i].pt, 10, cv::Scalar(255,0,0), CV_FILLED, 8.0);
+        cv::circle(currImage, matched_currKeypoints[i].pt, 10, cv::Scalar(0,0,255), CV_FILLED, 8.0);
     }
 
     cv::namedWindow("Matched Features", CV_WINDOW_AUTOSIZE);
