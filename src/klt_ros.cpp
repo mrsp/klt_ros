@@ -90,7 +90,7 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
     }
     else
     {
-        //currImage = cv_ptr->image;
+        currImageRGB = cv_ptr->image;
         cvtColor(cv_ptr->image, currImage, cv::COLOR_BGR2GRAY);
         if (!voInitialized)
             voInitialized = true;
@@ -172,7 +172,7 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
                           const cv::Mat &prevDescr,
                           const cv::Mat &currDescr,
                           std::vector<cv::DMatch> &good_matches, 
-                          std::vector<cv::KeyPoint> m_points1, std::vector<cv::KeyPoint> m_points2, std::vector<cv::KeyPoint> m_points1_transformed, cv::Mat m_d1, cv::Mat m_d2)
+                          std::vector<cv::KeyPoint>& m_points1, std::vector<cv::KeyPoint>& m_points2, std::vector<cv::KeyPoint> &m_points1_transformed, cv::Mat& m_d1, cv::Mat& m_d2)
 {
     std::vector<cv::DMatch> knn_matches;
     knn_simple(points1, points2, prevDescr, currDescr, knn_matches);
@@ -449,12 +449,17 @@ void klt_ros::vo()
         {
             //featureDetection(currImage, currFeatures);
             siftFeatureDetection(currImage, currKeypoints, currDescr);
+            
             std::vector<cv::DMatch> good_matches;
+            std::vector<cv::KeyPoint>  matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
+            cv::Mat matched_prevDescr, matched_currDescr;
 
             estimate2Dtf(prevKeypoints, currKeypoints, prevDescr, currDescr, 
             good_matches, matched_prevKeypoints, matched_currKeypoints, matched_prevKeypoints_transformed, matched_prevDescr, matched_currDescr);
 
-            plotTransformedKeypoints();
+            plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
+            computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
+
             //show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
 
         }
@@ -475,19 +480,49 @@ void klt_ros::vo()
         img_inc = false;
     }
 }
-void klt_ros::plotTransformedKeypoints()
+void klt_ros::plotTransformedKeypoints(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
 {
 
     for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
     {
-        cv::circle(currImage, matched_prevKeypoints_transformed[i].pt, 10, cv::Scalar(255,0,0), CV_FILLED, 8.0);
-        cv::circle(currImage, matched_currKeypoints[i].pt, 10, cv::Scalar(0,0,255), CV_FILLED, 8.0);
+        cv::circle(currImageRGB, matched_prevKeypoints_transformed[i].pt, 5, CV_RGB(255,0,0), 1);
+        cv::circle(currImageRGB, matched_currKeypoints[i].pt, 5, CV_RGB(0,255,0), -1);
     }
 
-    cv::namedWindow("Matched Features", CV_WINDOW_AUTOSIZE);
-    cv::imshow("Matched Features", currImage);
-    cv::waitKey(0);
+  
+     char buf[128];
+    sprintf(buf, "/tmp/keypoints/transformed_keypoints_%d.png", frame);
+    cv::imwrite(buf, currImageRGB);
 }
+
+void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
+{ 
+    Eigen::VectorXd errorX, errorY;
+    errorX.resize(matched_prevKeypoints_transformed.size());
+    errorY.resize(matched_prevKeypoints_transformed.size());
+
+    for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
+    {
+        errorX(i) = matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x;
+        errorY(i) = matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y;
+    }
+
+    
+  
+    char buf[128];
+    sprintf(buf, "/tmp/keypoint_error/error_%d.txt", frame);
+    std::ofstream file(buf);
+    if (file.is_open())
+    {
+        file << "Error (Pixels)" << errorX << "\t" << errorY<< std::endl;
+        file << "Mean Error (Pixels) "<< errorX.mean() << "\t "<< errorY.mean()<<std::endl;
+        file << "Max Error (Pixels) "<< errorX.maxCoeff() << "\t "<< errorY.maxCoeff()<<std::endl;
+        file << "Min Error (Pixels) "<< errorX.minCoeff() << "\t "<< errorY.minCoeff()<<std::endl;
+    }
+
+
+}
+
 
 void klt_ros::plotFeatures()
 {
@@ -500,6 +535,8 @@ void klt_ros::plotFeatures()
     cv::namedWindow("Good Featurse to Track", CV_WINDOW_AUTOSIZE);
     cv::imshow("Good Features to Track", prevImage);
     cv::waitKey(0);
+
+
 }
 
 bool orderVec(const std::vector<cv::DMatch> &v1, const std::vector<cv::DMatch> &v2)

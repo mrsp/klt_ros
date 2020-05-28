@@ -13,7 +13,7 @@
 
 #include <eigen3/Eigen/Dense>
 #include "teaser/registration.h"
-
+#include <fstream>
 using namespace std;
 
 class klt_ros
@@ -28,14 +28,14 @@ class klt_ros
     vector<uchar> status;
     vector<cv::Point2f> currFeatures, prevFeatures; //vectors to store the coordinates of the feature points
     
-    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints, matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
-    cv::Mat prevDescr,currDescr, matched_prevDescr, matched_currDescr;
+    std::vector<cv::KeyPoint> prevKeypoints, currKeypoints;
+    cv::Mat prevDescr,currDescr;
     
     cv::Point2d pp;
     bool firstImageCb, firstCameraInfoCb, img_inc;
     bool trackOn, voInitialized;
     int MIN_NUM_FEAT;
-    cv::Mat currImage, prevImage;
+    cv::Mat currImage, prevImage, currImageRGB;
     cv::Mat R_f, t_f, R, R_2D, t_2D, t, E;
     teaser::RobustRegistrationSolver::Params tparams;
     teaser::RobustRegistrationSolver *solver;
@@ -66,19 +66,19 @@ public:
                           const cv::Mat &prevDescr,
                           const cv::Mat &currDescr,
                           std::vector<cv::DMatch> &good_matches, 
-                          std::vector<cv::KeyPoint> m_points1, std::vector<cv::KeyPoint> m_points2, std::vector<cv::KeyPoint> m_points1_transformed, cv::Mat m_d1, cv::Mat m_d2);
+                          std::vector<cv::KeyPoint>& m_points1, std::vector<cv::KeyPoint>& m_points2, std::vector<cv::KeyPoint>& m_points1_transformed, cv::Mat& m_d1, cv::Mat& m_d2);
     
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
     void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
     void vo();
     void plotFeatures();
-    void plotTransformedKeypoints();
+    void plotTransformedKeypoints(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
     void show_matches(const cv::Mat &img_1,
                            const cv::Mat &img_2,
                            const std::vector<cv::KeyPoint> keypoints1,
                            const std::vector<cv::KeyPoint> keypoints2,
                            const std::vector<cv::DMatch> &good_matches);
-    
+    void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
     void siftFeatureDetection(const cv::Mat &img_1, 
                               std::vector<cv::KeyPoint> &points1,
                               cv::Mat &descriptors1);
