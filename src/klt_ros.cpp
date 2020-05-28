@@ -172,7 +172,11 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
                           const cv::Mat &prevDescr,
                           const cv::Mat &currDescr,
                           std::vector<cv::DMatch> &good_matches, 
-                          std::vector<cv::KeyPoint>& m_points1, std::vector<cv::KeyPoint>& m_points2, std::vector<cv::KeyPoint> &m_points1_transformed, cv::Mat& m_d1, cv::Mat& m_d2)
+                          std::vector<cv::KeyPoint>& m_points1, 
+                           std::vector<cv::KeyPoint>& m_points2, 
+                           std::vector<cv::KeyPoint> &m_points1_transformed, 
+                           cv::Mat& m_d1, 
+                           cv::Mat& m_d2)
 {
     std::vector<cv::DMatch> knn_matches;
     knn_simple(points1, points2, prevDescr, currDescr, knn_matches);
@@ -199,13 +203,7 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
 
         cv::KeyPoint p1 = points1[qidx];
         cv::KeyPoint p2 = points2[tidx];
-        cv::Mat d1 = prevDescr.row(qidx);
-        cv::Mat d2 = currDescr.row(tidx);
 
-        m_points1[i] = p1;
-        m_points2[i] = p2;
-        m_d1.row(i) = d1;
-        m_d2.row(i) = d1;
 
         src.col(i) << p1.pt.x, p1.pt.y, 0;
         dst.col(i) << p2.pt.x, p2.pt.y, 0;
@@ -224,6 +222,26 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
             R_2D.at<double>(i, j) = R.at<double>(i, j);
         }
     }
+    
+    for (size_t i = 0; i < good_matches.size(); i++)
+    {
+        cv::DMatch m=good_matches[i];
+        int qidx = m.queryIdx;
+        int tidx = m.trainIdx;
+
+        cv::KeyPoint p1 = points1[qidx];
+        cv::KeyPoint p2 = points2[tidx];
+        
+        cv::Mat d1 = prevDescr.row(qidx);
+        cv::Mat d2 = currDescr.row(tidx);
+
+        m_points1[i] = p1;
+        m_points2[i] = p2;
+        m_d1.row(i) = d1;
+        m_d2.row(i) = d1;
+    }
+    
+    
     t_2D.at<double>(0) = t.at<double>(0);
     t_2D.at<double>(1) = t.at<double>(1);
     
