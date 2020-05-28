@@ -472,11 +472,18 @@ void klt_ros::vo()
             std::vector<cv::KeyPoint>  matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
             cv::Mat matched_prevDescr, matched_currDescr;
 
-            estimate2Dtf(prevKeypoints, currKeypoints, prevDescr, currDescr, 
-            good_matches, matched_prevKeypoints, matched_currKeypoints, matched_prevKeypoints_transformed, matched_prevDescr, matched_currDescr);
+            bool matched=estimate2Dtf(prevKeypoints, currKeypoints,
+                                      prevDescr, currDescr, 
+                                      good_matches, 
+                                      matched_prevKeypoints, matched_currKeypoints, 
+                                      matched_prevKeypoints_transformed, 
+                                      matched_prevDescr, matched_currDescr);
 
-            plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
-            computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
+            if(matched)
+            {
+                plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
+                computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
+            }
 
             //show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
 
@@ -521,8 +528,8 @@ void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched
 
     for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
     {
-        errorX(i) = matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x;
-        errorY(i) = matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y;
+        errorX(i) = abs(matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x);
+        errorY(i) = abs(matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y);
     }
 
     
