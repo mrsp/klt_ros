@@ -41,7 +41,7 @@ class klt_ros
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage, currImageRGB, prevDepthImage,currDepthImage;
     cv::Mat R_f, t_f, R, R_2D, t_2D, t, E;
-    Eigen::MatrixXd R_eig;
+    Eigen::MatrixXd Rot_eig;
     Eigen::VectorXd t_eig;
     teaser::RobustRegistrationSolver::Params tparams;
     teaser::RobustRegistrationSolver *solver;

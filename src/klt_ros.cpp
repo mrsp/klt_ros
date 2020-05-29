@@ -21,8 +21,8 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     t_2D = cv::Mat::zeros(3, 1, CV_64F);
     R = cv::Mat::eye(3, 3, CV_64F);
     t = cv::Mat::zeros(3, 1, CV_64F);
-    R_eig.resize(3,3);
-    R_eig.setIdentity();
+    Rot_eig.resize(3,3);
+    Rot_eig.setIdentity();
     t_eig.resize(3);
     t_eig.setZero();
     ros::NodeHandle n_p("~");
