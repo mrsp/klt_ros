@@ -720,7 +720,6 @@ void klt_ros::vo()
                                         prevDescr, currDescr, 
                                         good_matches, 
                                         matched_prevKeypoints, matched_currKeypoints, 
-                                        matched_prevKeypoints_transformed,
                                         matched_prevPoints_3D, matched_currPoints_3D, 
                                         matched_prevPoints_transformed_3D);
 
