@@ -708,7 +708,15 @@ void klt_ros::vo()
                  std::vector<Eigen::Vector3d>  matched_currPoints_3D;
                  std::vector<Eigen::Vector3d>  matched_prevPoints_transformed_3D;
 
-                 bool matched=estimate2DtfAnd3DPoints(prevKeypoints, currKeypoints,
+                //  bool matched=estimate2DtfAnd3DPoints(prevKeypoints, currKeypoints,
+                //                         prevDescr, currDescr, 
+                //                         good_matches, 
+                //                         matched_prevKeypoints, matched_currKeypoints, 
+                //                         matched_prevKeypoints_transformed,
+                //                         matched_prevPoints_3D, matched_currPoints_3D, 
+                //                         matched_prevPoints_transformed_3D);
+
+                 bool matched=estimate3Dtf(prevKeypoints, currKeypoints,
                                         prevDescr, currDescr, 
                                         good_matches, 
                                         matched_prevKeypoints, matched_currKeypoints, 
@@ -716,10 +724,11 @@ void klt_ros::vo()
                                         matched_prevPoints_3D, matched_currPoints_3D, 
                                         matched_prevPoints_transformed_3D);
 
+
                 if(matched)
                 {
-                    plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
-                    computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
+                    //plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
+                    //computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
                     computeTransformedKeypoints3DError(matched_currPoints_3D, matched_prevPoints_transformed_3D);
                 }                              
 
