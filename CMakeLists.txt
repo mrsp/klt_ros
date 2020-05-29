@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   image_transport
   cv_bridge
+  message_filters
 )
 SET(teaser_src
     ${CMAKE_CURRENT_LIST_DIR}/src/teaser/graph.cc
@@ -53,7 +54,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
  catkin_package(
  INCLUDE_DIRS include 
  LIBRARIES ${PROJECT_NAME}
- CATKIN_DEPENDS roscpp 
+ CATKIN_DEPENDS roscpp message_filters
  )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}  

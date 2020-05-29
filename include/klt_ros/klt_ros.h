@@ -3,7 +3,9 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <cv_bridge/cv_bridge.h>
-
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/synchronizer.h>
 #include "opencv2/video/tracking.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -16,7 +18,7 @@
 #include <fstream>
 using namespace std;
 
-typedef sync_policies::ApproximateTime<sensor_msgs::Image,sensor_msgs::Image> MySyncPolicy;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,sensor_msgs::Image> MySyncPolicy;
 
 class klt_ros
 {
@@ -24,8 +26,8 @@ class klt_ros
     int height, width;
     double k1,k2,k3,t1,t2;
     double cx, cy, fx, fy;
-    ros::NodeHandle nh_;
-    image_transport::ImageTransport it_;
+    ros::NodeHandle nh;
+    image_transport::ImageTransport it;
     image_transport::Subscriber image_sub_;
     vector<uchar> status;
     vector<cv::Point2f> currFeatures, prevFeatures; //vectors to store the coordinates of the feature points
@@ -43,9 +45,9 @@ class klt_ros
     teaser::RobustRegistrationSolver *solver;
     
 
-    message_filters::Subscriber<sensor_msgs::Image> *image_sub;
-    message_filters::Subscriber<sensor_msgs::Image> *depth_sub;
-    Synchronizer<MySyncPolicy> *ts_sync;
+    message_filters::Subscriber<sensor_msgs::Image> image_sub;
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub;
+    message_filters::Synchronizer<MySyncPolicy> *ts_sync;
     std::string image_topic, depth_topic, cam_info_topic;
     cv::Ptr<cv::Feature2D> sift;
     
@@ -76,6 +78,7 @@ public:
                           std::vector<cv::KeyPoint>& m_points1, std::vector<cv::KeyPoint>& m_points2, std::vector<cv::KeyPoint>& m_points1_transformed, cv::Mat& m_d1, cv::Mat& m_d2);
     
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
+    void imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const sensor_msgs::ImageConstPtr &depth_msg);
     void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
     void vo();
     void plotFeatures();

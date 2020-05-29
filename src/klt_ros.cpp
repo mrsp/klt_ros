@@ -1,10 +1,10 @@
 #include <klt_ros/klt_ros.h>
 
-klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
+klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
 {
  
 
-
+    nh = nh_;
     sift = cv::xfeatures2d::SIFT::create();
 
     img_inc = false;
@@ -25,22 +25,23 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
     
     ros::NodeHandle n_p("~");
 
-    n_p.params<std::string>("image_topic",image_topic,"/camera/rgb/image_rect_color");
-    n_p.params<bool>("useDepth",useDepth,false);
-    n_p.params<std::string>("depth_topic",depth_topic,"/camera/depth_registered/image_rect");
-    n_p.params<std::string>("cam_info_topic",cam_info_topic, "/camera/rgb/camera_info");
+    n_p.param<std::string>("image_topic",image_topic,"/camera/rgb/image_rect_color");
+    n_p.param<bool>("useDepth",useDepth,true);
+    n_p.param<std::string>("depth_topic",depth_topic,"/camera/depth_registered/sw_registered/image_rect");
+    n_p.param<std::string>("cam_info_topic",cam_info_topic, "/camera/rgb/camera_info");
 
     if(useDepth)
     {        
-        image_sub = new message_filters::Subscriber<sensor_msgs::Image>(it_,image_topic,1);
-        depth_sub = new message_filters::Subscriber<sensor_msgs::Image>(it_,depth_topic,1);
+  
+        image_sub.subscribe(nh,image_topic,1);
+        depth_sub.subscribe(nh,depth_topic,1);
 
-        ts_sync = new Synchronizer<MySyncPolicy>(MySyncPolicy(10),image_sub,depht_sub);
+        ts_sync = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(10),image_sub,depth_sub);
 
         ts_sync->registerCallback(boost::bind(&klt_ros::imageDepthCb,this,_1,_2));
     }
     else
-        image_sub_ = it_.subscribe(image_topic, 1,  &klt_ros::imageCb, this);
+        image_sub_ = it.subscribe(image_topic, 1,  &klt_ros::imageCb, this);
 
     ROS_INFO("Waiting camera info");
     while(ros::ok())
@@ -55,8 +56,11 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
 }
 
 
-void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const sensor_msgs::CameraInfoConstPtr &depth_msg)
+void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const sensor_msgs::ImageConstPtr &depth_msg)
 {
+
+    ROS_INFO("Image and Depth Cb");
+
     cv_bridge::CvImagePtr cv_ptr;
     img_inc = true;
     try
