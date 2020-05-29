@@ -87,9 +87,9 @@ public:
                           std::vector<cv::KeyPoint> &m_points1_transformed, 
                           cv::Mat& m_d1, 
                           cv::Mat& m_d2,
-                          std::vector<Eigen::Vector3d>  m_points1_3D,
-                          std::vector<Eigen::Vector3d>  m_points2_3D,
-                          std::vector<Eigen::Vector3d>  m_points1_transformed_3D);
+                          std::vector<Eigen::Vector3d>&  m_points1_3D,
+                          std::vector<Eigen::Vector3d>&  m_points2_3D,
+                          std::vector<Eigen::Vector3d>&  m_points1_transformed_3D);
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
     void imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const sensor_msgs::ImageConstPtr &depth_msg);
     void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
@@ -102,7 +102,7 @@ public:
                            const std::vector<cv::KeyPoint> keypoints2,
                            const std::vector<cv::DMatch> &good_matches);
     void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
-    void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currPoints_3D, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed_3D);
+    void computeTransformedKeypoints3DError(std::vector<Eigen::Vector3d> matched_currKeypoints_3D, std::vector<Eigen::Vector3d> matched_prevKeypoints_transformed_3D);
     void siftFeatureDetection(const cv::Mat &img_1, 
                               std::vector<cv::KeyPoint> &points1,
                               cv::Mat &descriptors1);

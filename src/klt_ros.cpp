@@ -254,38 +254,38 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
                           std::vector<cv::KeyPoint> &m_points1_transformed, 
                           cv::Mat& m_d1, 
                           cv::Mat& m_d2,
-                          std::vector<Eigen::Vector3d>  m_points1_3D,
-                          std::vector<Eigen::Vector3d>  m_points2_3D,
-                          std::vector<Eigen::Vector3d>  m_points1_transformed_3D)
+                          std::vector<Eigen::Vector3d>&  m_points1_3D,
+                          std::vector<Eigen::Vector3d>&  m_points2_3D,
+                          std::vector<Eigen::Vector3d>&  m_points1_transformed_3D)
 {
     estimate2Dtf(points1,points2,prevDescr,currDescr,good_matches,m_points1,m_points2,m_points1_transformed,m_d1,m_d2);
     size_t xx, yy;
 
     m_points1_3D.resize(good_matches.size());
     m_points2_3D.resize(good_matches.size());
-    points1_transformed_3D.resize(good_matches.size());
+    m_points1_transformed_3D.resize(good_matches.size());
 
     for (size_t i = 0; i < good_matches.size(); i++)
     {
-        xx = (int) m_points_1[i].pt.x;
-        yy = (int) m_points_1[i].pt.y;
-        points1_3D[i](0) = (xx - cx) * prevDepthImage(xx,yy) / fx;
-        points1_3D[i](1) = (yy - cy) * prevDepthImage(xx,yy) / fy;
-        points1_3D[i](2) = prevDepthImage(xx,yy);
+        xx = (int) m_points1[i].pt.x;
+        yy = (int) m_points1[i].pt.y;
+        m_points1_3D[i](0) = (xx - cx) * prevDepthImage.at<double>(xx,yy) / fx;
+        m_points1_3D[i](1) = (yy - cy) * prevDepthImage.at<double>(xx,yy) / fy;
+        m_points1_3D[i](2) = prevDepthImage.at<double>(xx,yy);
 
-        xx = (int) m_points_1_transformed[i].pt.x;
-        yy = (int) m_points_1_transformed[i].pt.y;
-        points1_transformed_3D[i](0) = (xx - cx) * currDepthImage(xx,yy) / fx;
-        points1_transformed_3D[i](1) = (yy - cy) * currDepthImage(xx,yy) / fy;
-        points1_transformed_3D[i](2) = currDepthImage(xx,yy);
+        xx = (int) m_points1_transformed[i].pt.x;
+        yy = (int) m_points1_transformed[i].pt.y;
+        m_points1_transformed_3D[i](0) = (xx - cx) * currDepthImage.at<double>(xx,yy) / fx;
+        m_points1_transformed_3D[i](1) = (yy - cy) * currDepthImage.at<double>(xx,yy) / fy;
+        m_points1_transformed_3D[i](2) = currDepthImage.at<double>(xx,yy);
 
-        xx = (int) m_points_2[i].pt.x;
-        yy = (int) m_points_2[i].pt.y;
-        points2_3D[i](0) = (xx - cx) * currDepthImage(xx,yy) / fx;
-        points2_3D[i](1) = (yy - cy) * currDepthImage(xx,yy) / fy;
-        points2_3D[i](2) = currDepthImage(xx,yy);
+        xx = (int) m_points2[i].pt.x;
+        yy = (int) m_points2[i].pt.y;
+        m_points2_3D[i](0) = (xx - cx) * currDepthImage.at<double>(xx,yy) / fx;
+        m_points2_3D[i](1) = (yy - cy) * currDepthImage.at<double>(xx,yy) / fy;
+        m_points2_3D[i](2) = currDepthImage.at<double>(xx,yy);
     }
-
+    ROS_INFO("DONE ");
     return true;
 }
 
@@ -623,6 +623,7 @@ void klt_ros::vo()
                                         matched_prevDescr, matched_currDescr,
                                         matched_prevPoints_3D, matched_currPoints_3D, 
                                         matched_prevPoints_transformed_3D);
+
                 if(matched)
                 {
                     plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
@@ -670,23 +671,25 @@ void klt_ros::plotTransformedKeypoints(std::vector<cv::KeyPoint> matched_currKey
     cv::imwrite(buf, currImageRGB);
 }
 
-void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currPoints_3D, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed_3D)
+void klt_ros::computeTransformedKeypoints3DError(std::vector<Eigen::Vector3d> matched_currKeypoints_3D, std::vector<Eigen::Vector3d> matched_prevKeypoints_transformed_3D)
 { 
     Eigen::VectorXd errorX, errorY, errorZ;
+    std::cout<<matched_prevKeypoints_transformed_3D.size()<<" "<<matched_currKeypoints_3D.size()<<std::endl;
     errorX.resize(matched_prevKeypoints_transformed_3D.size());
     errorY.resize(matched_prevKeypoints_transformed_3D.size());
     errorZ.resize(matched_prevKeypoints_transformed_3D.size());
-
-    for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
+    ROS_INFO("HERE ");
+    for (size_t i = 0; i < matched_prevKeypoints_transformed_3D.size(); i++)
     {
         errorX(i) = fabs(matched_currKeypoints_3D[i](0) - matched_prevKeypoints_transformed_3D[i](0));
         errorY(i) = fabs(matched_currKeypoints_3D[i](1) - matched_prevKeypoints_transformed_3D[i](1));
         errorZ(i) = fabs(matched_currKeypoints_3D[i](2) - matched_prevKeypoints_transformed_3D[i](2));
     }
+    ROS_INFO("HERE2 ");
 
-    
+    std::cout<<errorX<<"\t"<<errorY<<"\t"<<errorZ<<std::endl;
   
-    char buf[128];
+    char buf[256];
     sprintf(buf, "/tmp/keypoint3D_error/error3D_%d.txt", frame);
     std::ofstream file(buf);
     if (file.is_open())
@@ -696,12 +699,13 @@ void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched
         file << "Max Error (m) "<< errorX.maxCoeff() << "\t "<< errorY.maxCoeff()<<"\t "<<errorZ.maxCoeff()<<std::endl;
         file << "Min Error (m) "<< errorX.minCoeff() << "\t "<< errorY.minCoeff()<<"\t "<<errorZ.minCoeff()<<std::endl;
     }
+    ROS_INFO("HERE3 ");
 
 
 }
 
 
-void klt_ros::computeTransformedKeypoints3DError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
+void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
 { 
     Eigen::VectorXd errorX, errorY;
     errorX.resize(matched_prevKeypoints_transformed.size());
