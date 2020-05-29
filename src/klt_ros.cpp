@@ -244,6 +244,45 @@ void klt_ros::teaserParams3DTFEstimation()
     tparams.rotation_cost_threshold = 0.005;
 }
 
+bool klt_ros::estimate2DtfAnd2DPoints(const std::vector<cv::KeyPoint> &points1,
+                          const std::vector<cv::KeyPoint> &points2,
+                          const cv::Mat &prevDescr,
+                          const cv::Mat &currDescr,
+                          std::vector<cv::DMatch> &good_matches, 
+                          std::vector<cv::KeyPoint>& m_points1, 
+                          std::vector<cv::KeyPoint>& m_points2, 
+                          std::vector<cv::KeyPoint> &m_points1_transformed)
+{    
+    m_points1.clear();
+    m_points2.clear();
+    m_points1_transformed.clear();
+    
+    bool matched=estimate2Dtf(points1,points2,prevDescr,currDescr,good_matches);
+    
+    if(!matched)
+        return false;
+
+    m_points1.reserve(good_matches.size());
+    m_points2.reserve(good_matches.size());
+    
+    for(int i=0;i<good_matches.size();i++)
+    {
+        //prev key points
+        cv::DMatch m = good_matches[i];
+        int qidx = m.queryIdx;
+        int tidx = m.trainIdx;
+
+        cv::KeyPoint p1 = points1[qidx];
+        cv::KeyPoint p2 = points2[tidx];
+        m_points1.push_back(p1);
+        m_points2.push_back(p2);        
+    }
+    
+    m_points1_transformed = transform2DKeyPoints(m_points1, R_2D, t_2D);
+
+    return true;
+}
+
 bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
                           const std::vector<cv::KeyPoint> &points2,
                           const cv::Mat &prevDescr,
@@ -252,94 +291,105 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
                           std::vector<cv::KeyPoint>& m_points1, 
                           std::vector<cv::KeyPoint>& m_points2, 
                           std::vector<cv::KeyPoint> &m_points1_transformed, 
-                          cv::Mat& m_d1, 
-                          cv::Mat& m_d2,
                           std::vector<Eigen::Vector3d>&  m_points1_3D,
                           std::vector<Eigen::Vector3d>&  m_points2_3D,
                           std::vector<Eigen::Vector3d>&  m_points1_transformed_3D)
-{
-    bool matched=estimate2Dtf(points1,points2,prevDescr,currDescr,good_matches,m_points1,m_points2,m_points1_transformed,m_d1,m_d2);
+{    
+    m_points1.clear();
+    m_points2.clear();
+    m_points1_transformed.clear();
+    
+    m_points1_3D.clear();
+    m_points2_3D.clear();
+    m_points1_transformed_3D.clear();
+    
+    good_matches.clear();
+    
+    bool matched=estimate2Dtf(points1,points2,prevDescr,currDescr,good_matches);
     
     if(!matched)
         return false;
 
-    float min_depth = 0.0001f;
+    m_points1.reserve(good_matches.size());
+    m_points2.reserve(good_matches.size());
     
     m_points1_3D.reserve(good_matches.size());
     m_points2_3D.reserve(good_matches.size());
-    m_points1_transformed_3D.reserve(good_matches.size());
-
-    for (size_t i = 0; i < good_matches.size(); i++)
+    //m_points1_transformed_3D.reserve(good_matches.size());
+    
+    float min_depth = 0.0001f;
+    
+    for(int i=0;i<good_matches.size();i++)
     {
         //prev key points
-        int x1,y1;
-        float d1;
-        
-        x1 = (int) (m_points1[i].pt.x + 0.5f);
-        y1 = (int) (m_points1[i].pt.y + 0.5f);
-        d1 = prevDepthImage.at<float>(x1,y1);
-        
-        if (d1 < 0.0001f || d1!=d1) // some near plane constraint and NaN elimination
-            continue;
+        cv::DMatch m = good_matches[i];
+        int qidx = m.queryIdx;
+        int tidx = m.trainIdx;
 
-        Eigen::Vector3d v1( (x1 - cx) * prevDepthImage.at<float>(x1,y1) / fx,
-                            (y1 - cy) * prevDepthImage.at<float>(x1,y1) / fy,
+        cv::KeyPoint p1 = points1[qidx];
+        cv::KeyPoint p2 = points2[tidx];        
+        
+        //current key points
+        int x1=p1.pt.x + 0.5f;
+        int y1=p1.pt.y + 0.5f;
+        float d1 = prevDepthImage.at<float>(x1,y1);
+        
+        int x2=p2.pt.x + 0.5f;
+        int y2=p2.pt.y + 0.5f;
+        float d2 = currDepthImage.at<float>(x2,y2);
+
+        // some near plane constraint and NaN elimination
+        if (d1 < 0.0001f || d2 < 0.0001f ||           
+            d1!=d1 || d2 != d2 ) 
+            continue;
+        
+        Eigen::Vector3d v1( (x1 - cx) * d1 / fx,
+                            (y1 - cy) * d1 / fy,
                              d1);            
 
+        Eigen::Vector3d v2( (x2 - cx) * d2 / fx,
+                            (y2 - cy) * d2 / fy,
+                             d2);            
+
+
+        m_points1.push_back(p1);
+        m_points2.push_back(p2);
+        
         m_points1_3D.push_back(v1);
-                                           
-        //current key points                
-        int x2,y2;
-        float d2;
-        
-        x2 = (int) (m_points2[i].pt.x + 0.5f);
-        y2 = (int) (m_points2[i].pt.y + 0.5f);
-        d2 = prevDepthImage.at<float>(x2,y2);
-        
-        if (d2 < 0.0001f || d2!=d2) // some near plane constraint and Nan elimination
-            continue;
-
-        Eigen::Vector3d v2( (x2 - cx) * prevDepthImage.at<float>(x2,y2) / fx,
-                            (y2 - cy) * prevDepthImage.at<float>(x2,y2) / fy,
-                             d2);   
-        
         m_points2_3D.push_back(v2);
-        
-        //key points tranformed
-        int xt,yt;
-        float dt;
-        
-        xt = (int) (m_points1_transformed[i].pt.x + 0.5f);
-        yt = (int) (m_points1_transformed[i].pt.y + 0.5f);
-        dt = currDepthImage.at<float>(xt,yt);
-        
-        if (dt < 0.0001f || dt!=dt) // some near plane constraint and NaN elimination
-            continue;
-
-        Eigen::Vector3d vt( (xt - cx) * currDepthImage.at<float>(xt,yt) / fx,
-                            (yt - cy) * currDepthImage.at<float>(xt,yt) / fy,
-                             dt);
-        
-        m_points1_transformed_3D.push_back(vt);
-                
     }
+    
+    if(m_points1.size()==0)
+        return false;
+    
+    m_points1_transformed = transform2DKeyPoints(m_points1, R_2D, t_2D);
+
+    m_points1_transformed_3D.reserve(m_points1.size());
+    for(int i=0;i<m_points1.size();i++)
+    {
+        cv::KeyPoint pt = m_points1_transformed[i];
+        int xt=pt.pt.x + 0.5f;
+        int yt=pt.pt.y + 0.5f;
+        float dt = currDepthImage.at<float>(xt,yt);
+        
+        Eigen::Vector3d vt( (xt - cx) * dt / fx,
+                            (yt - cy) * dt / fy,
+                             dt);
+        m_points1_transformed_3D.push_back(vt);
+
+    }
+    
     return true;
 }
 
-
-bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
-                          const std::vector<cv::KeyPoint> &points2,
-                          const cv::Mat &prevDescr,
-                          const cv::Mat &currDescr,
-                          std::vector<cv::DMatch> &good_matches, 
-                          std::vector<cv::KeyPoint>& m_points1, 
-                           std::vector<cv::KeyPoint>& m_points2, 
-                           std::vector<cv::KeyPoint> &m_points1_transformed, 
-                           cv::Mat& m_d1, 
-                           cv::Mat& m_d2)
+bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1, 
+                           const std::vector<cv::KeyPoint> &points2,
+                           const cv::Mat &descr1,
+                           const cv::Mat &descr2,
+                           std::vector<cv::DMatch> &good_matches)
 {
     std::vector<cv::DMatch> knn_matches;
-    knn_simple(points1, points2, prevDescr, currDescr, knn_matches);
+    knn_simple(points1, points2, descr1, descr2, knn_matches);
 
     if (knn_matches.size() < 10)
     {
@@ -349,11 +399,6 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
 
     Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, knn_matches.size());
     Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, knn_matches.size());
-
-    m_points1.resize(knn_matches.size());
-    m_points2.resize(knn_matches.size());
-    m_d1 = cv::Mat::zeros(knn_matches.size(),prevDescr.cols,CV_64F);
-    m_d2 = cv::Mat::zeros(knn_matches.size(),prevDescr.cols,CV_64F);
 
     for (size_t i = 0; i < knn_matches.size(); i++)
     {
@@ -367,8 +412,6 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
 
         src.col(i) << p1.pt.x, p1.pt.y, 0;
         dst.col(i) << p2.pt.x, p2.pt.y, 0;
-
-
     }
 
 
@@ -383,31 +426,10 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
         }
     }
     
-    for (size_t i = 0; i < good_matches.size(); i++)
-    {
-        cv::DMatch m=good_matches[i];
-        int qidx = m.queryIdx;
-        int tidx = m.trainIdx;
-
-        cv::KeyPoint p1 = points1[qidx];
-        cv::KeyPoint p2 = points2[tidx];
-        
-        cv::Mat d1 = prevDescr.row(qidx);
-        cv::Mat d2 = currDescr.row(tidx);
-
-        m_points1[i] = p1;
-        m_points2[i] = p2;
-        m_d1.row(i) = d1;
-        m_d2.row(i) = d1;
-    }
-    
-    
     t_2D.at<double>(0) = t.at<double>(0);
     t_2D.at<double>(1) = t.at<double>(1);
     
-    m_points1_transformed = transform2DKeyPoints(m_points1, R_2D, t_2D);
-
-    return true; 
+    return true;
 }
 
 std::vector<cv::KeyPoint> klt_ros::transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints, cv::Mat Rotation, cv::Mat Translation)
@@ -617,12 +639,11 @@ void klt_ros::vo()
 
             if(!useDepth)
             {
-                bool matched=estimate2Dtf(prevKeypoints, currKeypoints,
-                                        prevDescr, currDescr, 
-                                        good_matches, 
-                                        matched_prevKeypoints, matched_currKeypoints, 
-                                        matched_prevKeypoints_transformed, 
-                                        matched_prevDescr, matched_currDescr);
+                bool matched=estimate2DtfAnd2DPoints(prevKeypoints, currKeypoints,
+                                                     prevDescr, currDescr, 
+                                                     good_matches, 
+                                                     matched_prevKeypoints, matched_currKeypoints, 
+                                                     matched_prevKeypoints_transformed);
                 if(matched)
                 {
                     plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
@@ -639,8 +660,7 @@ void klt_ros::vo()
                                         prevDescr, currDescr, 
                                         good_matches, 
                                         matched_prevKeypoints, matched_currKeypoints, 
-                                        matched_prevKeypoints_transformed, 
-                                        matched_prevDescr, matched_currDescr,
+                                        matched_prevKeypoints_transformed,
                                         matched_prevPoints_3D, matched_currPoints_3D, 
                                         matched_prevPoints_transformed_3D);
 
@@ -721,7 +741,8 @@ void klt_ros::computeTransformedKeypoints3DError(std::vector<Eigen::Vector3d> ma
 }
 
 
-void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
+void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, 
+                                               std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
 { 
     Eigen::VectorXd errorX, errorY;
     errorX.resize(matched_prevKeypoints_transformed.size());
@@ -729,8 +750,8 @@ void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched
 
     for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
     {
-        errorX(i) = abs(matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x);
-        errorY(i) = abs(matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y);
+        errorX(i) = fabs(matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x);
+        errorY(i) = fabs(matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y);
     }
 
     

@@ -69,14 +69,12 @@ public:
 
     std::vector<cv::KeyPoint> transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation);
 
-    //void estimate2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2);
-    bool estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
-                          const std::vector<cv::KeyPoint> &points2,
-                          const cv::Mat &prevDescr,
-                          const cv::Mat &currDescr,
-                          std::vector<cv::DMatch> &good_matches, 
-                          std::vector<cv::KeyPoint>& m_points1, std::vector<cv::KeyPoint>& m_points2, std::vector<cv::KeyPoint>& m_points1_transformed, cv::Mat& m_d1, cv::Mat& m_d2);
-    
+    bool estimate2Dtf(const std::vector<cv::KeyPoint> &points1, 
+                           const std::vector<cv::KeyPoint> &points2,
+                           const cv::Mat &descr1,
+                           const cv::Mat &descr2,
+                           std::vector<cv::DMatch> &good_matches);
+
     bool estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
                           const std::vector<cv::KeyPoint> &points2,
                           const cv::Mat &prevDescr,
@@ -85,11 +83,19 @@ public:
                           std::vector<cv::KeyPoint>& m_points1, 
                           std::vector<cv::KeyPoint>& m_points2, 
                           std::vector<cv::KeyPoint> &m_points1_transformed, 
-                          cv::Mat& m_d1, 
-                          cv::Mat& m_d2,
                           std::vector<Eigen::Vector3d>&  m_points1_3D,
                           std::vector<Eigen::Vector3d>&  m_points2_3D,
                           std::vector<Eigen::Vector3d>&  m_points1_transformed_3D);
+
+    bool estimate2DtfAnd2DPoints(const std::vector<cv::KeyPoint> &points1,
+                          const std::vector<cv::KeyPoint> &points2,
+                          const cv::Mat &prevDescr,
+                          const cv::Mat &currDescr,
+                          std::vector<cv::DMatch> &good_matches, 
+                          std::vector<cv::KeyPoint>& m_points1, 
+                          std::vector<cv::KeyPoint>& m_points2, 
+                          std::vector<cv::KeyPoint> &m_points1_transformed);
+    
     void imageCb(const sensor_msgs::ImageConstPtr &msg);
     void imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const sensor_msgs::ImageConstPtr &depth_msg);
     void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
