@@ -67,6 +67,8 @@ public:
     void featureTracking(cv::Mat img_1, cv::Mat img_2, std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2, std::vector<uchar> &status);
 
     void featureDetection(cv::Mat img_1, std::vector<cv::Point2f> &points1);
+    
+    
     void trackFeatures();
 
     std::vector<cv::KeyPoint> transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation);
@@ -126,6 +128,10 @@ public:
     void siftFeatureDetection(const cv::Mat &img_1, 
                               std::vector<cv::KeyPoint> &points1,
                               cv::Mat &descriptors1);
+    void siftFeatureDetection(const cv::Mat &img_1,
+                              std::vector<cv::KeyPoint> &points1,
+                              cv::Mat &descriptors1,
+                              cv::Mat &depth);
     
     void knn_simple(std::vector<cv::KeyPoint> keypoints1,
                     std::vector<cv::KeyPoint> keypoints2,

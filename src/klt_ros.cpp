@@ -97,7 +97,7 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const senso
         //prevImage = cv_ptr->image;
         cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
         prevDepthImage = cv_depth_ptr->image;
-        siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+        siftFeatureDetection(prevImage, prevKeypoints, prevDescr,prevDepthImage);
 
         firstImageCb = false;
 
@@ -264,12 +264,12 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p2 = points2[tidx];        
         
         //current key points
-        int x1=p1.pt.x + 0.5f;
-        int y1=p1.pt.y + 0.5f;
+        int x1=p1.pt.y + 0.5f;
+        int y1=p1.pt.x + 0.5f;
         float d1 = prevDepthImage.at<float>(x1,y1);
         
-        int x2=p2.pt.x + 0.5f;
-        int y2=p2.pt.y + 0.5f;
+        int x2=p2.pt.y + 0.5f;
+        int y2=p2.pt.x + 0.5f;
         float d2 = currDepthImage.at<float>(x2,y2);
 
         // some near plane constraint and NaN elimination
@@ -360,19 +360,23 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p1 = points1[qidx];
         cv::KeyPoint p2 = points2[tidx];        
         
-        //current key points
-        int x1=p1.pt.x + 0.5f;
-        int y1=p1.pt.y + 0.5f;
+//         //current key points
+        int x1=p1.pt.y + 0.5f;
+        int y1=p1.pt.x + 0.5f;
         float d1 = prevDepthImage.at<float>(x1,y1);
-        
-        int x2=p2.pt.x + 0.5f;
-        int y2=p2.pt.y + 0.5f;
+         
+        int x2=p2.pt.y + 0.5f;
+        int y2=p2.pt.x + 0.5f;
         float d2 = currDepthImage.at<float>(x2,y2);
-
-        // Near plane constraint and NaN elimination
-        if (d1 < 0.0001f || d2 < 0.0001f ||           
-            d1!=d1 || d2 != d2 ) 
-            continue;
+ 
+         // Near plane constraint and NaN elimination
+        
+         if (d1 < 0.0001f || d2 < 0.0001f ||           
+             d1!=d1 || d2 != d2 ) 
+         {
+             //This should never happen
+             std::cout<<"[WARNIN} NaN values on depth."<<std::endl;
+         }
 
         Eigen::Vector3d v1( (x1 - cx) * d1 / fx,
                             (y1 - cy) * d1 / fy,
@@ -382,18 +386,16 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
                             (y2 - cy) * d2 / fy,
                              d2);            
 
-        m_points1.push_back(p1);
-        m_points2.push_back(p2);
+        //m_points1.push_back(p1);
+        //m_points2.push_back(p2);
         m_points1_3D.push_back(v1);
         m_points2_3D.push_back(v2);
-
-
     }
 
     //Prepare Keypoints for Teaser
-    Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, m_points1.size());
-    Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, m_points2.size());
-    for(int i=0;i<m_points1.size();i++)
+    Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, m_points1_3D.size());
+    Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, m_points1_3D.size());
+    for(int i=0;i<m_points1_3D.size();i++)
     {
         src.col(i) << m_points1_3D[i];
         dst.col(i) << m_points2_3D[i];
@@ -424,12 +426,12 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p1 = points1[qidx];
         cv::KeyPoint p2 = points2[tidx];
         //current key points
-        int x1=p1.pt.x + 0.5f;
-        int y1=p1.pt.y + 0.5f;
+        int x1=p1.pt.y + 0.5f;
+        int y1=p1.pt.x + 0.5f;
         float d1 = prevDepthImage.at<float>(x1,y1);
         
-        int x2=p2.pt.x + 0.5f;
-        int y2=p2.pt.y + 0.5f;
+        int x2=p2.pt.y + 0.5f;
+        int y2=p2.pt.x + 0.5f;
         float d2 = currDepthImage.at<float>(x2,y2);
          Eigen::Vector3d v1( (x1 - cx) * d1 / fx,
                             (y1 - cy) * d1 / fy,
@@ -496,8 +498,8 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p2 = points2[tidx];
 
 
-        src.col(i) << p1.pt.x, p1.pt.y, 0;
-        dst.col(i) << p2.pt.x, p2.pt.y, 0;
+        src.col(i) << p1.pt.y, p1.pt.x, 0;
+        dst.col(i) << p2.pt.y, p2.pt.x, 0;
     }
 
 
@@ -663,7 +665,35 @@ void klt_ros::siftFeatureDetection(const cv::Mat &img_1,
     sift->detectAndCompute(img_1, cv::noArray(), points1, descriptors1);
 }
 
+void klt_ros::siftFeatureDetection(const cv::Mat &img_1,
+                                   std::vector<cv::KeyPoint> &points1,
+                                   cv::Mat &descriptors1,
+                                   cv::Mat &depth)
+{
+    cv::Mat mask=cv::Mat::ones(depth.rows,depth.cols, CV_8U );
 
+     for(int r=0;r<depth.rows; r++)
+     {
+         for(int c=0;  c<depth.cols; c++)
+         {
+             float d = depth.at<float>(r,c);
+             if( d<0.0001f || d!=d)
+             {
+                 mask.at<uchar>(r,c)=0;
+             }
+         }
+     }
+
+    /*
+    cv::Mat outMasked;
+    cv::bitwise_and(img_1,img_1,outMasked,mask);
+    
+    char buf[32];
+    sprintf(buf, "/tmp/d/mask%d.png", frame);
+    cv::imwrite(buf, outMasked);
+    */
+    sift->detectAndCompute(img_1, mask, points1, descriptors1);
+}
 
 
 void klt_ros::vo()
@@ -683,7 +713,7 @@ void klt_ros::vo()
         else
         {
             //featureDetection(currImage, currFeatures);
-            siftFeatureDetection(currImage, currKeypoints, currDescr);
+            
             
             std::vector<cv::DMatch> good_matches;
             std::vector<cv::KeyPoint>  matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
@@ -691,6 +721,7 @@ void klt_ros::vo()
 
             if(!useDepth)
             {
+                siftFeatureDetection(currImage, currKeypoints, currDescr);
                 bool matched=estimate2DtfAnd2DPoints(prevKeypoints, currKeypoints,
                                                      prevDescr, currDescr, 
                                                      good_matches, 
@@ -704,6 +735,7 @@ void klt_ros::vo()
             }
             else
             {
+                siftFeatureDetection(currImage, currKeypoints, currDescr,currDepthImage);
                  std::vector<Eigen::Vector3d>  matched_prevPoints_3D;
                  std::vector<Eigen::Vector3d>  matched_currPoints_3D;
                  std::vector<Eigen::Vector3d>  matched_prevPoints_transformed_3D;
@@ -736,7 +768,7 @@ void klt_ros::vo()
 
            
 
-            //show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
+            show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
 
         }
         double scale = 1.0;
@@ -846,8 +878,8 @@ void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched
 
     for (size_t i = 0; i < matched_prevKeypoints_transformed.size(); i++)
     {
-        errorX(i) = fabs(matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x);
-        errorY(i) = fabs(matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y);
+        errorX(i) = fabs(matched_currKeypoints[i].pt.y - matched_prevKeypoints_transformed[i].pt.y);
+        errorY(i) = fabs(matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x);
     }
 
     
