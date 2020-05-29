@@ -2,9 +2,7 @@
 
 klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
 {
-    // Subscrive to input video feed and publish output video feed
-    image_sub_ = it_.subscribe("/camera/rgb/image_rect_color", 1,
-                               &klt_ros::imageCb, this);
+ 
 
 
     sift = cv::xfeatures2d::SIFT::create();
@@ -18,13 +16,32 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
     voInitialized = false;
 
     frame = 0;
-        R_f = cv::Mat::eye(3, 3, CV_64F);
-        t_f = cv::Mat::zeros(3, 1, CV_64F);
-        R_2D = cv::Mat::eye(3, 3, CV_64F);
-        t_2D = cv::Mat::zeros(3, 1, CV_64F);
-        R = cv::Mat::eye(3, 3, CV_64F);
-        t = cv::Mat::zeros(3, 1, CV_64F);
-    string cam_info_topic  = "/camera/rgb/camera_info";
+    R_f = cv::Mat::eye(3, 3, CV_64F);
+    t_f = cv::Mat::zeros(3, 1, CV_64F);
+    R_2D = cv::Mat::eye(3, 3, CV_64F);
+    t_2D = cv::Mat::zeros(3, 1, CV_64F);
+    R = cv::Mat::eye(3, 3, CV_64F);
+    t = cv::Mat::zeros(3, 1, CV_64F);
+    
+    ros::NodeHandle n_p("~");
+
+    n_p.params<std::string>("image_topic",image_topic,"/camera/rgb/image_rect_color");
+    n_p.params<bool>("useDepth",useDepth,false);
+    n_p.params<std::string>("depth_topic",depth_topic,"/camera/depth_registered/image_rect");
+    n_p.params<std::string>("cam_info_topic",cam_info_topic, "/camera/rgb/camera_info");
+
+    if(useDepth)
+    {        
+        image_sub = new message_filters::Subscriber<sensor_msgs::Image>(it_,image_topic,1);
+        depth_sub = new message_filters::Subscriber<sensor_msgs::Image>(it_,depth_topic,1);
+
+        ts_sync = new Synchronizer<MySyncPolicy>(MySyncPolicy(10),image_sub,depht_sub);
+
+        ts_sync->registerCallback(boost::bind(&klt_ros::imageDepthCb,this,_1,_2));
+    }
+    else
+        image_sub_ = it_.subscribe(image_topic, 1,  &klt_ros::imageCb, this);
+
     ROS_INFO("Waiting camera info");
     while(ros::ok())
     {
@@ -35,6 +52,62 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it_(nh_)
             break;
         }
     }
+}
+
+
+void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg,const sensor_msgs::CameraInfoConstPtr &depth_msg)
+{
+    cv_bridge::CvImagePtr cv_ptr;
+    img_inc = true;
+    try
+    {
+        cv_ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::BGR8);
+
+    }
+    catch (cv_bridge::Exception &e)
+
+    {
+        ROS_ERROR("cv_bridge RGB exception: %s", e.what());
+        return;
+    }
+
+    cv_bridge::CvImagePtr cv_depth_ptr;
+    try
+    {
+        cv_depth_ptr = cv_bridge::toCvCopy(depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+
+    }
+    catch (cv_bridge::Exception &e)
+
+    {
+        ROS_ERROR("cv_bridge DEPTH exception: %s", e.what());
+        return;
+    }
+
+
+
+    if (firstImageCb)
+    {
+        //prevImage = cv_ptr->image;
+        cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
+        prevDepthImage = cv_depth_ptr->image;
+        siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+
+        firstImageCb = false;
+
+    }
+    else
+    {
+        currImageRGB = cv_ptr->image;
+        cvtColor(cv_ptr->image, currImage, cv::COLOR_BGR2GRAY);
+        currDepthImage = cv_depth_ptr->image;
+        if (!voInitialized)
+            voInitialized = true;
+    }
+    frame++;
+
+
+
 }
 
 void klt_ros::cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg)

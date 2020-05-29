@@ -16,6 +16,8 @@
 #include <fstream>
 using namespace std;
 
+typedef sync_policies::ApproximateTime<sensor_msgs::Image,sensor_msgs::Image> MySyncPolicy;
+
 class klt_ros
 {
     int frame;
@@ -33,13 +35,18 @@ class klt_ros
     
     cv::Point2d pp;
     bool firstImageCb, firstCameraInfoCb, img_inc;
-    bool trackOn, voInitialized;
+    bool trackOn, voInitialized, useDepth;
     int MIN_NUM_FEAT;
-    cv::Mat currImage, prevImage, currImageRGB;
+    cv::Mat currImage, prevImage, currImageRGB, prevDepthImage,currDepthImage;
     cv::Mat R_f, t_f, R, R_2D, t_2D, t, E;
     teaser::RobustRegistrationSolver::Params tparams;
     teaser::RobustRegistrationSolver *solver;
+    
 
+    message_filters::Subscriber<sensor_msgs::Image> *image_sub;
+    message_filters::Subscriber<sensor_msgs::Image> *depth_sub;
+    Synchronizer<MySyncPolicy> *ts_sync;
+    std::string image_topic, depth_topic, cam_info_topic;
     cv::Ptr<cv::Feature2D> sift;
     
 public:
