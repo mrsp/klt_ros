@@ -258,32 +258,70 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
                           std::vector<Eigen::Vector3d>&  m_points2_3D,
                           std::vector<Eigen::Vector3d>&  m_points1_transformed_3D)
 {
-    estimate2Dtf(points1,points2,prevDescr,currDescr,good_matches,m_points1,m_points2,m_points1_transformed,m_d1,m_d2);
-    size_t xx, yy;
+    bool matched=estimate2Dtf(points1,points2,prevDescr,currDescr,good_matches,m_points1,m_points2,m_points1_transformed,m_d1,m_d2);
+    
+    if(!matched)
+        return false;
 
-    m_points1_3D.resize(good_matches.size());
-    m_points2_3D.resize(good_matches.size());
-    m_points1_transformed_3D.resize(good_matches.size());
+    float min_depth = 0.0001f;
+    
+    m_points1_3D.reserve(good_matches.size());
+    m_points2_3D.reserve(good_matches.size());
+    m_points1_transformed_3D.reserve(good_matches.size());
 
     for (size_t i = 0; i < good_matches.size(); i++)
     {
-        xx = (int) m_points1[i].pt.x;
-        yy = (int) m_points1[i].pt.y;
-        m_points1_3D[i](0) = (xx - cx) * prevDepthImage.at<float>(xx,yy) / fx;
-        m_points1_3D[i](1) = (yy - cy) * prevDepthImage.at<float>(xx,yy) / fy;
-        m_points1_3D[i](2) = prevDepthImage.at<float>(xx,yy);
+        //prev key points
+        int x1,y1;
+        float d1;
+        
+        x1 = (int) (m_points1[i].pt.x + 0.5f);
+        y1 = (int) (m_points1[i].pt.y + 0.5f);
+        d1 = prevDepthImage.at<float>(x1,y1);
+        
+        if (d1 < 0.0001f || d1!=d1) // some near plane constraint and NaN elimination
+            continue;
 
-        xx = (int) m_points1_transformed[i].pt.x;
-        yy = (int) m_points1_transformed[i].pt.y;
-        m_points1_transformed_3D[i](0) = (xx - cx) * currDepthImage.at<float>(xx,yy) / fx;
-        m_points1_transformed_3D[i](1) = (yy - cy) * currDepthImage.at<float>(xx,yy) / fy;
-        m_points1_transformed_3D[i](2) = currDepthImage.at<float>(xx,yy);
+        Eigen::Vector3d v1( (x1 - cx) * prevDepthImage.at<float>(x1,y1) / fx,
+                            (y1 - cy) * prevDepthImage.at<float>(x1,y1) / fy,
+                             d1);            
 
-        xx = (int) m_points2[i].pt.x;
-        yy = (int) m_points2[i].pt.y;
-        m_points2_3D[i](0) = (xx - cx) * currDepthImage.at<float>(xx,yy) / fx;
-        m_points2_3D[i](1) = (yy - cy) * currDepthImage.at<float>(xx,yy) / fy;
-        m_points2_3D[i](2) = currDepthImage.at<float>(xx,yy);
+        m_points1_3D.push_back(v1);
+                                           
+        //current key points                
+        int x2,y2;
+        float d2;
+        
+        x2 = (int) (m_points2[i].pt.x + 0.5f);
+        y2 = (int) (m_points2[i].pt.y + 0.5f);
+        d2 = prevDepthImage.at<float>(x2,y2);
+        
+        if (d2 < 0.0001f || d2!=d2) // some near plane constraint and Nan elimination
+            continue;
+
+        Eigen::Vector3d v2( (x2 - cx) * prevDepthImage.at<float>(x2,y2) / fx,
+                            (y2 - cy) * prevDepthImage.at<float>(x2,y2) / fy,
+                             d2);   
+        
+        m_points2_3D.push_back(v2);
+        
+        //key points tranformed
+        int xt,yt;
+        float dt;
+        
+        xt = (int) (m_points1_transformed[i].pt.x + 0.5f);
+        yt = (int) (m_points1_transformed[i].pt.y + 0.5f);
+        dt = currDepthImage.at<float>(xt,yt);
+        
+        if (dt < 0.0001f || dt!=dt) // some near plane constraint and NaN elimination
+            continue;
+
+        Eigen::Vector3d vt( (xt - cx) * currDepthImage.at<float>(xt,yt) / fx,
+                            (yt - cy) * currDepthImage.at<float>(xt,yt) / fy,
+                             dt);
+        
+        m_points1_transformed_3D.push_back(vt);
+                
     }
     return true;
 }
@@ -553,23 +591,6 @@ void klt_ros::trackFeatures()
     }
     featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
 }
-
-/*
-void klt_ros::estimate2Dtf(std::vector<cv::Point2f> &points1, std::vector<cv::Point2f> &points2)
-{
-    int N = min(points1.size(), points2.size());
-    Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, N);
-    Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, N);
-
-    for (size_t i = 0; i < N; ++i)
-    {
-        src.col(i) << points1[i].x, points1[i].y, 0.0;
-        dst.col(i) << points2[i].x, points2[i].y, 0.0;
-    }
-
-    estimateAffineTFTeaser(src, dst);
-}
-*/
 
 void klt_ros::vo()
 {
