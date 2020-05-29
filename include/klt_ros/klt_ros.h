@@ -41,6 +41,8 @@ class klt_ros
     int MIN_NUM_FEAT;
     cv::Mat currImage, prevImage, currImageRGB, prevDepthImage,currDepthImage;
     cv::Mat R_f, t_f, R, R_2D, t_2D, t, E;
+    Eigen::MatrixXd R_eig;
+    Eigen::VectorXd t_eig;
     teaser::RobustRegistrationSolver::Params tparams;
     teaser::RobustRegistrationSolver *solver;
     
@@ -68,12 +70,24 @@ public:
     void trackFeatures();
 
     std::vector<cv::KeyPoint> transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation);
+    std::vector<Eigen::Vector3d> transform3DKeyPoints(const std::vector<Eigen::Vector3d> Keypoints, Eigen::MatrixXd Rotation, Eigen::VectorXd Translation);
 
     bool estimate2Dtf(const std::vector<cv::KeyPoint> &points1, 
                            const std::vector<cv::KeyPoint> &points2,
                            const cv::Mat &descr1,
                            const cv::Mat &descr2,
                            std::vector<cv::DMatch> &good_matches);
+                           
+    bool estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
+                          const std::vector<cv::KeyPoint> &points2,
+                          const cv::Mat &descr1,
+                          const cv::Mat &descr2,
+                          std::vector<cv::DMatch> &good_matches, 
+                          std::vector<cv::KeyPoint>& m_points1, 
+                          std::vector<cv::KeyPoint>& m_points2, 
+                          std::vector<Eigen::Vector3d>&  m_points1_3D,
+                          std::vector<Eigen::Vector3d>&  m_points2_3D,
+                          std::vector<Eigen::Vector3d>&  m_points1_transformed_3D);
 
     bool estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
                           const std::vector<cv::KeyPoint> &points2,
