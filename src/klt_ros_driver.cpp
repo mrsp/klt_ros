@@ -12,7 +12,7 @@
 int main(int argc, char *argv[])
 {
 
-    ros::init(argc, argv, "klt_ros_node");
+    ros::init(argc, argv, "klt_ros");
     ros::NodeHandle n;
     klt_ros klt(n);
     static ros::Rate rate(100);
