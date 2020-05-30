@@ -795,9 +795,9 @@ void klt_ros::show_matches(const cv::Mat &img_1,
                     std::vector<char>(),
                     cv::DrawMatchesFlags::DEFAULT);
 
-    char buf[1024];
-    sprintf(buf, output_path + "/matches/good_matches_%d.png", frame);
-    cv::imwrite(buf, img_matches);
+    std::string filename = output_path+ "/matches/good_matches_" + std::to_string(frame)+".png";
+
+    cv::imwrite(filename, img_matches);
 }
 
 void klt_ros::plotTransformedKeypoints(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed)
@@ -811,9 +811,9 @@ void klt_ros::plotTransformedKeypoints(std::vector<cv::KeyPoint> matched_currKey
         cv::circle(currImageRGB, matched_currKeypoints[i].pt, 5, CV_RGB(0, 255, 0), -1);
     }
 
-    char buf[1024];
-    sprintf(buf, output_path + "/keypoints/transformed_keypoints_%d.png", frame);
-    cv::imwrite(buf, currImageRGB);
+    std::string filename = output_path+ "/keypoints/transformed_keypoints_" + std::to_string(frame)+".png";
+
+    cv::imwrite(filename, currImageRGB);
 }
 
 void klt_ros::computeTransformedKeypoints3DError(std::vector<Eigen::Vector3d> matched_currKeypoints_3D, std::vector<Eigen::Vector3d> matched_prevKeypoints_transformed_3D)
@@ -833,9 +833,8 @@ void klt_ros::computeTransformedKeypoints3DError(std::vector<Eigen::Vector3d> ma
         errorZ(i) = fabs(matched_currKeypoints_3D[i](2) - matched_prevKeypoints_transformed_3D[i](2));
     }
 
-    char buf[1024];
-    sprintf(buf, output_path + "/keypoint3D_error/error3D_%d.txt", frame);
-    std::ofstream file(buf);
+    std::string filename = output_path+ "/keypoint3D_error/error3D_" + std::to_string(frame)+".txt";
+    std::ofstream file(filename);
     if (file.is_open())
     {
         file << "ErrorX=[" << errorX << "]"<< std::endl;
@@ -872,9 +871,9 @@ void klt_ros::computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched
         errorY(i) = fabs(matched_currKeypoints[i].pt.x - matched_prevKeypoints_transformed[i].pt.x);
     }
 
-    char buf[1024];
-    sprintf(buf, output_path + "/keypoint_error/error_%d.txt", frame);
-    std::ofstream file(buf);
+    std::string filename = output_path+ "/keypoint_error/error_" + std::to_string(frame)+".txt";
+
+    std::ofstream file(filename);
     if (file.is_open())
     {
         file << "PixelErrorX=[" << errorX << "]"<< std::endl;
