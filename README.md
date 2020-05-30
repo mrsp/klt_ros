@@ -24,13 +24,13 @@ These instructions will get you a copy of the project up and running on your loc
 ## Documentation
 * doxygen Doxyfile
 
-## Example of transforming features detected in image 0 (red) to image 1 and comparison with detected features in image 1 (green)
+## Example of transforming features detected in image 0 (red) to image 1 and compare with detected features in image 1 (green)
 <p float="center">
   <img src="img/keypoints0.png" width="400" />
   <img src="img/keypoints1.png" width="400" /> 
 </p>
 
-## Example of transforming matching features detected in image 0  to image 1 
+## Example of matching features detected in image 0 to image 1 
 <p float="center">
   <img src="img/strongmatches0.png" width="1000" />
 </p>
