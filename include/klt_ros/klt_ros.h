@@ -68,6 +68,7 @@ class klt_ros
     /// ROS image subscriber only called when RGB image is used and not DEPTH image.
     image_transport::Subscriber image_sub_;
     vector<uchar> status;
+    std::string output_path;
     ///vectors to store the Harris corners of Previous Image and Current Image (when Harris Features are enabled)
     vector<cv::Point2f> currFeatures, prevFeatures;
     ///vectors to store the SIFT Features of Previous Image and Current Image (when SIFT Features are enabled)
@@ -79,7 +80,7 @@ class klt_ros
     /// Flags for first Image Callback, first Camera Info Callback, and for new image callback
     bool firstImageCb, firstCameraInfoCb, img_inc;
     // Flags for Tracking features with KLT Tracker instead of detecting new ones, checking VO initialization, and USE depth image along with RGB
-    bool trackOn, voInitialized, useDepth;
+    bool trackOn, voInitialized, useDepth, benchmark_3D;
     /// Minimum number of features for KLT Tracking
     int MIN_NUM_FEAT;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
