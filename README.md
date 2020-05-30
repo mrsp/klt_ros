@@ -4,7 +4,7 @@ These instructions will get you a copy of the project up and running on your loc
 ## Prerequisites
 * Ubuntu 16.04 and later
 * ROS kinetic and later
-* Eigen 3.2.0 and later
+* Eigen 3.3.0 and later
 
 
 ## Installing
