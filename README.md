@@ -23,6 +23,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ## Documentation
 * doxygen Doxyfile
+* or visit http://spiperakis.com/klt_ros/
 
 ## Example of transforming features detected in image 0 (red) to image 1 and compare with detected features in image 1 (green)
 <p float="center">
