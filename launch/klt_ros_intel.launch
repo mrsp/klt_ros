@@ -1,9 +1,11 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Call klt_ros -->
-  <node pkg="klt_ros" type="klt_ros" name="klt_ros" respawn="false" output="screen" >
- 	<!-- Load configurations from YAML file to parameter server -->
-   	 <rosparam file="$(find klt_ros)/config/intel.yaml" command="load"/> 
-  </node>
+    <!-- Call klt_ros -->
+    <node pkg="klt_ros" type="klt_ros" name="klt_ros" respawn="false" output="screen" >
+    <!-- Load configurations from YAML file to parameter server -->
+        <rosparam file="$(find klt_ros)/config/intel.yaml" command="load"/> 
+    </node>
 
+    <node pkg = "rviz" type = "rviz" respawn = "false" name = "rviz" output = "screen" args ="-d $(find klt_ros)/config/klt_ros_intel.rviz"> </node>
+  
 </launch>

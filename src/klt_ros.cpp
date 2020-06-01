@@ -1,4 +1,10 @@
 #include <klt_ros/klt_ros.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <Eigen/Geometry> 
+
+#define PUB_ODOM_PATH_TOPIC "/klt_ros/odomPath"
+
+#include <klt_ros/utils.h>
 
 klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
 {
@@ -44,6 +50,8 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
         ts_sync = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(10), image_sub, depth_sub);
 
         ts_sync->registerCallback(boost::bind(&klt_ros::imageDepthCb, this, _1, _2));
+        
+        odom_path_pub = n_p.advertise<nav_msgs::Path>(PUB_ODOM_PATH_TOPIC, 50);
     }
     else
         image_sub_ = it.subscribe(image_topic, 1, &klt_ros::imageCb, this);
@@ -88,9 +96,7 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
     {
         ROS_ERROR("cv_bridge DEPTH exception: %s", e.what());
         return;
-    }
-    
-    std::cout<<"TYPE:"<<cv_depth_ptr->image.type()<<std::endl;
+    }    
     
     if(mm_to_meters)
         cv_depth_ptr->image *= 0.001;
@@ -444,7 +450,7 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
     return true;
 }
 std::vector<Eigen::Vector3d> klt_ros::transform3DKeyPoints(const std::vector<Eigen::Vector3d> Keypoints, Eigen::MatrixXd Rotation, Eigen::VectorXd Translation)
-{
+{    
     std::vector<Eigen::Vector3d> Keypoints_transformed;
     Keypoints_transformed.resize(Keypoints.size());
 
@@ -723,18 +729,26 @@ void klt_ros::vo()
                                         matched_prevKeypoints_transformed,
                                         matched_prevPoints_3D, matched_currPoints_3D,
                                         matched_prevPoints_transformed_3D);
+                    
                 }
                 else
-                {
-                    if(useDepth)  // You need Depth to estimate 3D Points
-                    {
-                        matched = estimate3Dtf(prevKeypoints, currKeypoints,
+                {                   
+                    matched = estimate3Dtf(prevKeypoints, currKeypoints,
                                             prevDescr, currDescr,
                                             good_matches,
                                             matched_prevKeypoints, matched_currKeypoints,
                                             matched_prevPoints_3D, matched_currPoints_3D,
                                             matched_prevPoints_transformed_3D);
+                    if(matched)
+                    {
+                        Eigen::Affine3d delta;
+                        delta.translation() = t_eig;
+                        delta.linear() = Rot_eig;
+                        curr_pose = delta*curr_pose;
+                    
+                        addTfToPaht(curr_pose);
                     }
+                 
                 }
                 
 
@@ -772,7 +786,7 @@ void klt_ros::vo()
         std::cout << "VO" << std::endl;
         std::cout << t_f << std::endl;
         std::cout << R_f << std::endl;
-        img_inc = false;
+        img_inc = false;        
     }
 }
 
@@ -781,6 +795,48 @@ void klt_ros::vo()
 /* Helper Functions */
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
+void klt_ros::addTfToPaht(const Eigen::Affine3d &vision_pose)
+{
+    Eigen::Affine3d pose=fromVisionCord(vision_pose);
+    Eigen::Matrix3d rot=pose.linear();
+    Eigen::Vector3d t_f=pose.translation();
+    Eigen::Quaterniond quat(rot);
+
+    geometry_msgs::PoseStamped ps;
+    ps.header.stamp = ros::Time::now();
+    ps.header.frame_id = "odom";
+    ps.pose.position.x=t_f(0);
+    ps.pose.position.y=t_f(1);
+    ps.pose.position.z=t_f(2);
+    
+    ps.pose.orientation.x=quat.x();
+    ps.pose.orientation.y=quat.y();
+    ps.pose.orientation.z=quat.z();
+    ps.pose.orientation.w=quat.w();
+    
+    odomPath.poses.push_back(ps);
+    /*
+    ps.header.stamp = ros::Time::now();
+    ps.header.frame_id = "odom";
+    ps.pose=p;
+    odomPath.poses.push_back(ps);
+    
+    nav_msgs::Path newPath=odomPath;
+    newPath.header.stamp = ros::Time::now();
+    newPath.header.frame_id = VO_FRAME;
+
+    odom_path_pub.publish(newPath);*/
+}
+
+void klt_ros::publishOdomPath()
+{    
+    std::cout<<"publish odom path"<<std::endl;
+    nav_msgs::Path newPath=odomPath;
+    newPath.header.stamp = ros::Time::now();
+    newPath.header.frame_id = "odom";
+    
+    odom_path_pub.publish(newPath);
+}
 
 void klt_ros::show_matches(const cv::Mat &img_1,
                            const cv::Mat &img_2,
@@ -907,11 +963,6 @@ void klt_ros::plotFeatures()
     cv::namedWindow("Good Featurse to Track", CV_WINDOW_AUTOSIZE);
     cv::imshow("Good Features to Track", prevImage);
     cv::waitKey(0);
-}
-
-bool orderVec(const std::vector<cv::DMatch> &v1, const std::vector<cv::DMatch> &v2)
-{
-    return v1[0].queryIdx < v2[0].queryIdx;
 }
 
 void klt_ros::knn_mutual(std::vector<cv::KeyPoint> keypoints1,

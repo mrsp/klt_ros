@@ -19,6 +19,11 @@ int main(int argc, char *argv[])
     while (ros::ok())
     {
         klt.vo();
+        
+        if(klt.is3D())
+        {
+            klt.publishOdomPath();
+        }
         ros::spinOnce();
         rate.sleep();
     }

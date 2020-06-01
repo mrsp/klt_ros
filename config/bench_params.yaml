@@ -2,6 +2,6 @@ image_topic: "/camera/rgb/image_rect_color"
 cam_info_topic: "/camera/rgb/camera_info"
 useDepth: true #if true specify a valid depth topic
 depth_topic: "/camera/depth_registered/sw_registered/image_rect"
-benchmark_3D: false  #will compute 3D Keypoint Error / needs depth
+benchmark_3D: true  #will compute 3D Keypoint Error / needs depth
 output_path: "/tmp"
 mm_to_meters: true

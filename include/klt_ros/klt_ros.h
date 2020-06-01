@@ -30,6 +30,8 @@
  * @brief Visual Feature Benchmarking utilyzing RGB and Depth images
  */
 #include <ros/ros.h>
+#include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -105,16 +107,28 @@ class klt_ros
     std::string image_topic, depth_topic, cam_info_topic;
     /// SIFT feature detector
     cv::Ptr<cv::Feature2D> sift;
-
+    //odometry path from visualization on rviz
+    nav_msgs::Path odomPath;
+    //odometry path publisher
+    ros::Publisher odom_path_pub;
+    //current pose from vo
+    Eigen::Affine3d curr_pose;
 public:
     /** @fn  klt_ros(ros::NodeHandle nh_);
 	 *  @brief Initializes the VO Benchmarking
      *  @param nh_ ros nodehandler 
 	 */
     klt_ros(ros::NodeHandle nh_);
+    /** @fn is3D()
+	 *  @brief return true if klt_ros finds 3d tfs.
+	 */
+    inline bool is3D() const
+    {
+        return benchmark_3D;
+    }
     /** @fn teaserParams2DTFEstimation()
 	 *  @brief Initializes Teaser Optimization Parameters for 2D TF Estimation
-	 */
+	 */    
     void teaserParams2DTFEstimation();
     /** @fn teaserParams3DTFEstimation()
 	 *  @brief Initializes Teaser Optimization Parameters for 3D TF Estimation
@@ -324,6 +338,16 @@ public:
                       const std::vector<cv::KeyPoint> keypoints1,
                       const std::vector<cv::KeyPoint> keypoints2,
                       const std::vector<cv::DMatch> &good_matches);
+    /** @fn void addTfToPaht(const Eigen::MatrixXd &R_f, const Eigen::VectorXd &t_f)
+     * @param R_f rotation matrix
+     * @param t_f translation vector
+     *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
+     */
+    void publishOdomPath();
+    /** @fn void publishOdomPath()
+     *  @brief publish alredy constructed odometry path.
+     */
+    void addTfToPaht(const Eigen::Affine3d &pose);
     /** @fn void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
      * @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
      */
