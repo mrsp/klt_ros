@@ -33,7 +33,8 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     n_p.param<std::string>("cam_info_topic", cam_info_topic, "/camera/rgb/camera_info");
     n_p.param<bool>("benchmark_3D", benchmark_3D, true);
     n_p.param<std::string>("output_path", output_path, "/tmp");
-
+    n_p.param<bool>("mm_to_meters", mm_to_meters, false);
+    
     if (useDepth)
     {
 
@@ -88,6 +89,11 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
         ROS_ERROR("cv_bridge DEPTH exception: %s", e.what());
         return;
     }
+    
+    std::cout<<"TYPE:"<<cv_depth_ptr->image.type()<<std::endl;
+    
+    if(mm_to_meters)
+        cv_depth_ptr->image *= 0.001;
 
     if (firstImageCb)
     {

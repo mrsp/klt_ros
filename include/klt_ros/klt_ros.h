@@ -80,7 +80,7 @@ class klt_ros
     /// Flags for first Image Callback, first Camera Info Callback, and for new image callback
     bool firstImageCb, firstCameraInfoCb, img_inc;
     // Flags for Tracking features with KLT Tracker instead of detecting new ones, checking VO initialization, and USE depth image along with RGB
-    bool trackOn, voInitialized, useDepth, benchmark_3D;
+    bool trackOn, voInitialized, useDepth, benchmark_3D, mm_to_meters;
     /// Minimum number of features for KLT Tracking
     int MIN_NUM_FEAT;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
