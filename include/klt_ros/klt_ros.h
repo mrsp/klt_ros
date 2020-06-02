@@ -352,18 +352,18 @@ public:
                            const std::vector<cv::KeyPoint> keypoints1,
                            const std::vector<cv::KeyPoint> keypoints2,
                            const std::vector<cv::DMatch> &good_matches);   
-    /** @fn void addTfToPaht(const Eigen::MatrixXd &R_f, const Eigen::VectorXd &t_f)
-     * @param R_f rotation matrix
-     * @param t_f translation vector
-     *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
-     */
-    void publishOdomPath();
     /** @fn void publishOdomPath()
      *  @brief publish alredy constructed odometry path.
      */
-    void addTfToPaht(const Eigen::Affine3d &pose);
+    void publishOdomPath();
+    /** @fn void addTfToPath(const Eigen::MatrixXd &R_f, const Eigen::VectorXd &t_f)
+     *  @param R_f rotation matrix
+     *  @param t_f translation vector
+     *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
+     */
+    void addTfToPath(const Eigen::Affine3d &pose);
     /** @fn void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
-     * @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
+     *  @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
      */
     void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
 
