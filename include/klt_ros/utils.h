@@ -17,7 +17,6 @@ inline Eigen::Affine3d fromVisionCord(const Eigen::Affine3d &pose)
     Eigen::Affine3d ret;
     ret.matrix() = invT_B_P*pose*T_B_P;
     return ret;
-//     return 
 } 
 
 bool orderVec(const std::vector<cv::DMatch> &v1, const std::vector<cv::DMatch> &v2)
