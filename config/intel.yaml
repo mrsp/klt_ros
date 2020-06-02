@@ -5,3 +5,4 @@ depth_topic: "/d400/aligned_depth_to_color/image_raw"
 benchmark_3D: true  #will compute 3D Keypoint Error / needs depth
 output_path: "/tmp"
 mm_to_meters: true
+publish_matches: true

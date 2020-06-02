@@ -82,7 +82,7 @@ class klt_ros
     /// Flags for first Image Callback, first Camera Info Callback, and for new image callback
     bool firstImageCb, firstCameraInfoCb, img_inc;
     // Flags for Tracking features with KLT Tracker instead of detecting new ones, checking VO initialization, and USE depth image along with RGB
-    bool trackOn, voInitialized, useDepth, benchmark_3D, mm_to_meters;
+    bool trackOn, voInitialized, useDepth, benchmark_3D, mm_to_meters, publish_matches;
     /// Minimum number of features for KLT Tracking
     int MIN_NUM_FEAT;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
@@ -113,6 +113,8 @@ class klt_ros
     ros::Publisher odom_path_pub;
     //current pose from vo
     Eigen::Affine3d curr_pose;
+    //publish matches image
+    ros::Publisher matches_pub;
 public:
     /** @fn  klt_ros(ros::NodeHandle nh_);
 	 *  @brief Initializes the VO Benchmarking
@@ -338,6 +340,18 @@ public:
                       const std::vector<cv::KeyPoint> keypoints1,
                       const std::vector<cv::KeyPoint> keypoints2,
                       const std::vector<cv::DMatch> &good_matches);
+    /** @fn void publishMatches(const cv::Mat &img_1,
+                           const cv::Mat &img_2,
+                           const std::vector<cv::KeyPoint> keypoints1,
+                           const std::vector<cv::KeyPoint> keypoints2,
+                           const std::vector<cv::DMatch> &good_matches)  
+     *  @brief publish a ros message with an images displaying the matches
+     */
+    void publishMatches(const cv::Mat &img_1,
+                           const cv::Mat &img_2,
+                           const std::vector<cv::KeyPoint> keypoints1,
+                           const std::vector<cv::KeyPoint> keypoints2,
+                           const std::vector<cv::DMatch> &good_matches);   
     /** @fn void addTfToPaht(const Eigen::MatrixXd &R_f, const Eigen::VectorXd &t_f)
      * @param R_f rotation matrix
      * @param t_f translation vector
