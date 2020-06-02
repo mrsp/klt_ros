@@ -110,7 +110,7 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
         //prevImage = cv_ptr->image;
         cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
         prevDepthImage = cv_depth_ptr->image;
-        if (!useDepth)
+        if (useDepth)
         {
             siftFeatureDetection(prevImage, prevKeypoints, prevDescr, prevDepthImage);
         }
@@ -382,7 +382,7 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
             d1 != d1 || d2 != d2)
         {
             //This should never happen
-            std::cout << "[WARNIN] NaN values on depth." << std::endl;
+            std::cout << "[WARNING] NaN values on depth." << std::endl;
         }
 
         Eigen::Vector3d v1((x1 - cx) * d1 / fx,
