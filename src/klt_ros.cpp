@@ -118,7 +118,7 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
         //prevImage = cv_ptr->image;
         cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
         prevDepthImage = cv_depth_ptr->image;
-        if (!useDepth)
+        if (useDepth)
         {
             siftFeatureDetection(prevImage, prevKeypoints, prevDescr, prevDepthImage);
         }
@@ -390,7 +390,7 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
             d1 != d1 || d2 != d2)
         {
             //This should never happen
-            std::cout << "[WARNIN] NaN values on depth." << std::endl;
+            std::cout << "[WARNING] NaN values on depth." << std::endl;
         }
 
         Eigen::Vector3d v1((x1 - cx) * d1 / fx,
@@ -844,7 +844,7 @@ void klt_ros::vo()
                 delta=delta.inverse();
                 curr_pose = delta*curr_pose;
                 
-                addTfToPaht(curr_pose);                
+                addTfToPath(curr_pose);                
                 
             }
             else
@@ -897,19 +897,17 @@ void klt_ros::vo()
 /* Helper Functions */
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
-void klt_ros::addTfToPaht(const Eigen::Affine3d &vision_pose)
+void klt_ros::addTfToPath(const Eigen::Affine3d &vision_pose)
 {
     Eigen::Affine3d pose=fromVisionCord(vision_pose);
-    Eigen::Matrix3d rot=pose.linear();
-    Eigen::Vector3d t_f=pose.translation();
-    Eigen::Quaterniond quat(rot);
+    Eigen::Quaterniond quat(pose.linear());
 
     geometry_msgs::PoseStamped ps;
     ps.header.stamp = ros::Time::now();
     ps.header.frame_id = "odom";
-    ps.pose.position.x=t_f(0);
-    ps.pose.position.y=t_f(1);
-    ps.pose.position.z=t_f(2);
+    ps.pose.position.x=pose.translation()(0);
+    ps.pose.position.y=pose.translation()(1);
+    ps.pose.position.z=pose.translation()(2);
     
     ps.pose.orientation.x=quat.x();
     ps.pose.orientation.y=quat.y();
@@ -924,7 +922,6 @@ void klt_ros::publishOdomPath()
     nav_msgs::Path newPath=odomPath;
     newPath.header.stamp = ros::Time::now();
     newPath.header.frame_id = "odom";
-    
     odom_path_pub.publish(newPath);
 }
 
