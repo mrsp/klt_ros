@@ -7,6 +7,14 @@
 
 #include <klt_ros/utils.h>
 
+//opencv
+#include "opencv2/core.hpp"
+#include "opencv2/calib3d.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/features2d.hpp"
+#include "opencv2/xfeatures2d.hpp"
+
 klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
 {
 
@@ -16,7 +24,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     img_inc = false;
     firstImageCb = true;
     firstCameraInfoCb = true;
-    MIN_NUM_FEAT = 3;
+    MIN_NUM_FEAT = 10;
 
     trackOn = false;
     voInitialized = false;
@@ -341,7 +349,7 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
 
     //First Run the KNN Matcher to derive an Initial Correspondence.
     std::vector<cv::DMatch> knn_matches;
-    knn_simple(points1, points2, descr1, descr2, knn_matches);
+    knn(points1, points2, descr1, descr2, knn_matches);
 
     if (knn_matches.size() < MIN_NUM_FEAT)
     {
@@ -480,48 +488,124 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
                            std::vector<cv::DMatch> &good_matches)
 {
     std::vector<cv::DMatch> knn_matches;
-    knn_simple(points1, points2, descr1, descr2, knn_matches);
+    knn(points1, points2, descr1, descr2, knn_matches);
 
     if (knn_matches.size() < MIN_NUM_FEAT)
     {
         ROS_INFO("Not Enough Correspondences to Compute Camera Egomotion");
         return false;
     }
+    
+    std::vector<cv::Point2f> m_points1;
+    std::vector<cv::Point2f> m_points2;
+    
+    m_points1.reserve(knn_matches.size());
+    m_points2.reserve(knn_matches.size());
+    
+    for (int i = 0; i < knn_matches.size(); i++)
+    {
+        //prev key points
+        cv::DMatch m = knn_matches[i];
+        int qidx = m.queryIdx;
+        int tidx = m.trainIdx;
 
-    Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, knn_matches.size());
-    Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, knn_matches.size());
+        cv::Point2f p1 = points1[qidx].pt;
+        cv::Point2f p2 = points2[tidx].pt;
+        m_points1.push_back(p1);
+        m_points2.push_back(p2);
+    }
 
-    for (size_t i = 0; i < knn_matches.size(); i++)
+    double ransacReprojThreshold = 10;
+    cv::Mat H = findHomography( m_points1, m_points2, cv::RANSAC,ransacReprojThreshold);
+    
+    double reprojSq=ransacReprojThreshold*ransacReprojThreshold;
+    
+    std::cout<<"H"<<std::endl;
+    std::cout<<H<<std::endl;
+    std::cout<<H.empty()<<std::endl;
+    std::cout<<H.type()<<std::endl;
+    
+    std::cout<<m_points1<<std::endl;
+    std::cout<<m_points2.size()<<std::endl;
+    
+    //check if findHomography failed.
+    if( H.empty() )
+        return false;
+    
+    std::vector<cv::Point2f> points_trans;
+    points_trans.resize(m_points1.size());
+    perspectiveTransform( m_points1, points_trans, H);
+
+    for (int i = 0; i < knn_matches.size(); i++)
     {
         cv::DMatch m = knn_matches[i];
         int qidx = m.queryIdx;
         int tidx = m.trainIdx;
 
-        cv::KeyPoint p1 = points1[qidx];
-        cv::KeyPoint p2 = points2[tidx];
-
-        src.col(i) << p1.pt.y, p1.pt.x, 0;
-        dst.col(i) << p2.pt.y, p2.pt.x, 0;
-    }
-
-    teaserParams2DTFEstimation();
-    bool matched=estimateAffineTFTeaser(src, dst, knn_matches, good_matches);
-
-    if(!matched)
-        return false;
-    
-    for (int i = 0; i < 2; i++)
-    {
-        for (int j = 0; j < 2; j++)
+        cv::Point2f p1 = points_trans[qidx];
+        cv::Point2f p2 = m_points2[tidx];
+        
+        cv::Point2f diff(p1.x-p2.x,
+                         p1.y-p2.y);
+        
+//         std::cout<<diff<<std::endl;
+        
+        double l2sq=diff.x*diff.x+diff.y*diff.y;
+//         std::cout<<l2sq<<std::endl;
+        if(l2sq<reprojSq)
         {
-            R_2D.at<double>(i, j) = R.at<double>(i, j);
+            good_matches.push_back(m);
         }
     }
-
-    t_2D.at<double>(0) = t.at<double>(0);
-    t_2D.at<double>(1) = t.at<double>(1);
-
     return true;
+//     for (int i = 0; i < knn_matches.size(); i++)
+//     {
+//         //prev key points
+//         cv::DMatch m = knn_matches[i];
+//         int qidx = m.queryIdx;
+//         int tidx = m.trainIdx;
+// 
+//         cv::Point2f p1 = points1[qidx].pt;
+//         cv::Point2f p2 = points2[tidx].pt;
+//         m_points1.push_back(p1);
+//         m_points2.push_back(p2);
+//     }
+// 
+// 
+//     Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, knn_matches.size());
+//     Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, knn_matches.size());
+// 
+//     for (size_t i = 0; i < knn_matches.size(); i++)
+//     {
+//         cv::DMatch m = knn_matches[i];
+//         int qidx = m.queryIdx;
+//         int tidx = m.trainIdx;
+// 
+//         cv::KeyPoint p1 = points1[qidx];
+//         cv::KeyPoint p2 = points2[tidx];
+// 
+//         src.col(i) << p1.pt.y, p1.pt.x, 0;
+//         dst.col(i) << p2.pt.y, p2.pt.x, 0;
+//     }
+// 
+//     teaserParams2DTFEstimation();
+//     bool matched=estimateAffineTFTeaser(src, dst, knn_matches, good_matches);
+// 
+//     if(!matched)
+//         return false;
+//     
+//     for (int i = 0; i < 2; i++)
+//     {
+//         for (int j = 0; j < 2; j++)
+//         {
+//             R_2D.at<double>(i, j) = R.at<double>(i, j);
+//         }
+//     }
+// 
+//     t_2D.at<double>(0) = t.at<double>(0);
+//     t_2D.at<double>(1) = t.at<double>(1);
+// 
+//     return true;
 }
 
 std::vector<cv::KeyPoint> klt_ros::transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints, cv::Mat Rotation, cv::Mat Translation)
