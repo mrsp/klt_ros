@@ -322,16 +322,16 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
             continue;
         }
         
-        Eigen::Vector3d v1((x1 - cx) * d1 / fx,
-                           (y1 - cy) * d1 / fy,
+        Eigen::Vector3d v1(((double)x1 - cx) * d1 / fx,
+                           ((double)y1 - cy) * d1 / fy,
                            d1);
 
-        Eigen::Vector3d v2((x2 - cx) * d2 / fx,
-                           (y2 - cy) * d2 / fy,
+        Eigen::Vector3d v2(((double)x2 - cx) * d2 / fx,
+                           ((double)y2 - cy) * d2 / fy,
                            d2);
         
-        Eigen::Vector3d vt((xt - cx) * dt / fx,
-                           (yt - cy) * dt / fy,
+        Eigen::Vector3d vt(((double)xt - cx) * dt / fx,
+                           ((double)yt - cy) * dt / fy,
                            dt);        
         
         m_points1.push_back(p1);
@@ -361,35 +361,6 @@ bool klt_ros::estimate3DtfSVD(std::vector<Eigen::Vector3d> &m_points1_3D,
         point_mat2.row(i)=m_points2_3D[i];
     }
     
-    
-    /*
-    Eigen::MatrixXd point_mat1(10,3);
-    Eigen::MatrixXd point_mat2(10,3);
-    
-    point_mat1<<-0.4832,    0.2421,   -0.2480,
-    0.0454 ,  -0.0263  , -0.2093,
-    0.3660 ,  -0.2117  ,  0.1173,
-    0.1533 ,   0.0256  , -0.2345,
-   -0.3254 ,   0.0794  ,  0.3246,
-   -0.1469 ,  -0.2820  ,  0.4829,
-   -0.0551 ,   0.1869  ,  0.2305,
-    0.4658 ,  -0.1764 ,  -0.1559,
-   -0.3594 ,  -0.0180 ,   0.0843,
-    0.3397 ,   0.1804 ,  -0.3920;
-
-    point_mat2<<    0.8751  ,  2.8115   , 8.7520,
-    1.2825  ,  3.2423   , 8.7907,
-    1.5512  ,  3.4972   , 9.1173,
-    1.2633  ,  3.3606   , 8.7655,
-    1.0759  ,  2.9167  ,  9.3246,
-    1.4731   , 2.9854  ,  9.4829,
-    1.0495  ,  3.2064  ,  9.2305,
-    1.5457  ,  3.6029  ,  8.8441,
-    1.1597  ,  2.8565  ,  9.0843,
-    1.1678  ,  3.5831  ,  8.6080;
-    */
-    
-    
     Eigen::Vector3d m1=point_mat1.colwise().mean();
     Eigen::Vector3d m2=point_mat2.colwise().mean();    
 
@@ -404,18 +375,14 @@ bool klt_ros::estimate3DtfSVD(std::vector<Eigen::Vector3d> &m_points1_3D,
     Eigen::MatrixXd U = svd.matrixU();
         
     
-//     if(Rot_eig.determinant()<0)
-//     {
-//         std::cout<<"sign"<<std::endl;
-//          V(2,0)=V(2,0)*-1;
-//          V(2,1)=V(2,1)*-1;
-//          V(2,2)=V(2,2)*-1;
-//     }
+    if(Rot_eig.determinant()<0)
+    {
+        std::cout<<"sign"<<std::endl;
+        V(2,0)=V(2,0)*-1;
+        V(2,1)=V(2,1)*-1;
+        V(2,2)=V(2,2)*-1;
+    }
 
-//     std::cout<<"H:"<<H.rows() << "," << H.cols() << std::endl;
-//     std::cout<<"V:"<<V.rows() << "," << V.cols() << std::endl;
-//     std::cout<<"U:"<<U.rows() << "," << U.cols() << std::endl;
-    
     Rot_eig= V *U.transpose();
     
     /*
@@ -429,7 +396,7 @@ bool klt_ros::estimate3DtfSVD(std::vector<Eigen::Vector3d> &m_points1_3D,
     err=err.rowwise()+t_eig.transpose();
     err=err-point_mat2;
     
-    std::cout<<err.mean()<<std::endl;
+    std::cout<<"Mean error:"<<err.mean()<<std::endl;
     return true;
 //     Eigen::Vector3d trans = -rot * m1.transpose() + m2.transpose();
 }
@@ -588,9 +555,6 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
                            const std::vector<cv::DMatch> &initial_matches,
                            cv::Mat &H)
 {
-//     std::vector<cv::DMatch> knn_matches;
-//     knn(points1, points2, descr1, descr2, knn_matches);
-
     if (initial_matches.size() < MIN_NUM_FEAT)
     {
         ROS_INFO("Not Enough Correspondences to Compute Camera Egomotion");
@@ -619,34 +583,6 @@ bool klt_ros::estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
     H = findHomography( m_points1, m_points2, cv::RANSAC,ransacReprojThreshold);
 
     return !H.empty();
-    /*
-    //check if findHomography failed.
-    if( H.empty() )
-        return false;
-    
-    std::vector<cv::Point2f> points_trans;
-    points_trans.resize(m_points1.size());
-    perspectiveTransform( m_points1, points_trans, H);
-
-    
-    for (int i = 0; i < knn_matches.size(); i++)
-    {
-        cv::DMatch m = knn_matches[i];
-        int qidx = m.queryIdx;
-        int tidx = m.trainIdx;
-
-        cv::Point2f p1 = points_trans[qidx];
-        cv::Point2f p2 = m_points2[tidx];
-        
-        cv::Point2f diff(p1.x-p2.x,
-                         p1.y-p2.y);
-        
-        double l2sq=diff.x*diff.x+diff.y*diff.y;
-        if(l2sq<reprojSq)
-        {
-            good_matches.push_back(m);
-        }
-    }*/
 }
 
 void klt_ros::transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints,
@@ -939,7 +875,7 @@ void klt_ros::vo()
                 delta(3,2)=0;
                 delta(3,3)=1;
                 
-                delta=delta.inverse();
+                //delta=delta.inverse();
                 
                 curr_pose = delta*curr_pose;
                 
@@ -980,8 +916,8 @@ void klt_ros::vo()
 /* ---------------------------------------------------------------------- */
 void klt_ros::addTfToPath(const Eigen::Matrix4d &vision_pose)
 {
-    Eigen::Matrix4d pose=fromVisionCord(vision_pose);
-//     Eigen::Matrix4d pose=vision_pose;
+    //Eigen::Matrix4d pose=fromVisionCord(vision_pose);
+    Eigen::Matrix4d pose=vision_pose;
     Eigen::Matrix3d R=pose.block(0,0,3,3);
     Eigen::Quaterniond quat(R);
 
