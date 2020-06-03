@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     {
         klt.vo();
         
-        if(klt.is3D())
+        if(klt.isUsingDepth())
         {
             klt.publishOdomPath();
         }

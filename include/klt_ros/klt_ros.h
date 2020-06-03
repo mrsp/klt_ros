@@ -112,9 +112,11 @@ class klt_ros
     //odometry path publisher
     ros::Publisher odom_path_pub;
     //current pose from vo
-    Eigen::Affine3d curr_pose;
+    Eigen::Matrix4d curr_pose;
     //publish matches image
     ros::Publisher matches_pub;
+    //ransac reprojection threshold
+    double ransacReprojThreshold;
 public:
     /** @fn  klt_ros(ros::NodeHandle nh_);
 	 *  @brief Initializes the VO Benchmarking
@@ -128,6 +130,14 @@ public:
     {
         return benchmark_3D;
     }
+    /** @fn isUsingDepth()
+	 *  @brief return true if klt_ros uses depth.
+	 */
+    inline bool isUsingDepth() const
+    {
+        return useDepth;
+    }
+    
     /** @fn teaserParams2DTFEstimation()
 	 *  @brief Initializes Teaser Optimization Parameters for 2D TF Estimation
 	 */    
@@ -172,13 +182,36 @@ public:
      */
     void trackFeatures();
 
-    /** @fn std::vector<cv::KeyPoint> transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation)
-	 *  @brief transforms 2D Keypoints detected in Previous Image to Current Image with the estimated from Teaser 2D TF 
+    /** @fn void transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints,
+                                   std::vector<cv::KeyPoint> &Keypoints_transformed,
+                                   const cv::Mat &H)
+	 *  @brief transforms 2D Keypoints detected in Previous Image to Current Image with the estimated homography H
 	 *  @param points 2D keypoints in Previous Image
-     *  @param Rotation 2D Rotation from Previous Image to Current Image
-     *  @param Translation 2D Translation from Previous Image to Current Image
+     *  @param Keypoints_transformed output of 2D keypoints transformed to current image
+     *  @param H 3x3 homography
 	 */
-    std::vector<cv::KeyPoint> transform2DKeyPoints(const std::vector<cv::KeyPoint> points, cv::Mat Rotation, cv::Mat Translation);
+    void transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints,
+                                                   std::vector<cv::KeyPoint> &Keypoints_transformed,
+                                                   const cv::Mat &H);
+    
+    /** @fn void filterPoints(const std::vector<cv::KeyPoint> &Keypoints1,
+                      const std::vector<cv::KeyPoint> &Keypoints2,
+                      const std::vector<cv::KeyPoint> &initial_matches,
+                      std::vector<cv::KeyPoint> &good_matches,
+                      double threshold)
+
+	 *  @brief calculates l2 distance between Keypoints1 and Keypoints2 given their correspondeces in initial_matches.
+	 Then fills good_matches only if l2 distance is less than threshold
+	 *  @param Keypoints1 First set of keypoints
+     *  @param Keypoints2 Second set of keypoints
+     *  @param initial_matches matches of keypoints1 to keypoints2
+     *  @param threshold threshold that points consider outlier
+	 */
+    void filterPoints(const std::vector<cv::KeyPoint> &Keypoints1,
+                      const std::vector<cv::KeyPoint> &Keypoints2,
+                      const std::vector<cv::DMatch> &initial_matches,
+                      std::vector<cv::DMatch> &good_matches,
+                      double threshold);
 
     /** @fn std::vector<Eigen::Vector3d> transform3DKeyPoints(const std::vector<Eigen::Vector3d> Keypoints, Eigen::MatrixXd Rotation, Eigen::VectorXd Translation);
 	 *  @brief transforms 3D Keypoints detected in Previous Image to Current Image with the estimated from Teaser 3D TF 
@@ -192,19 +225,22 @@ public:
                            const std::vector<cv::KeyPoint> &points2,
                            const cv::Mat &descr1,
                            const cv::Mat &descr2,
-                           std::vector<cv::DMatch> &good_matches)
+                           const std::vector<cv::DMatch> &initial_matches,
+                           cv::Mat &H)
      * @brief computes the 2D TF from previous image to current image using the keypoints and descriptors detected/computed
      * @param points1 keypoints in previous image
      * @param points2 keypoints in current image
      * @param descr1 descriptors in previous image
      * @param descr2 descriptors in current image
-     * @param good_matches output correspondence with Teaser
+     * @param initial_matches initial matches vector
+     * @param H output homography
      */
     bool estimate2Dtf(const std::vector<cv::KeyPoint> &points1,
                       const std::vector<cv::KeyPoint> &points2,
                       const cv::Mat &descr1,
                       const cv::Mat &descr2,
-                      std::vector<cv::DMatch> &good_matches);
+                      const std::vector<cv::DMatch> &initial_matches,
+                      cv::Mat &H);
 
     /** @fn bool estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
                           const std::vector<cv::KeyPoint> &points2,
@@ -282,16 +318,16 @@ public:
                           std::vector<cv::DMatch> &good_matches, 
                           std::vector<cv::KeyPoint>& m_points1, 
                           std::vector<cv::KeyPoint>& m_points2, 
-                          std::vector<cv::KeyPoint> &m_points1_transformed)
+                          std::vector<cv::KeyPoint> &m_points1_2ed)
      * @brief computes the 3D TF from previous image to current image using the keypoints and descriptors detected/computed and the corresponding depth images
      * @param points1 keypoints in previous image
      * @param points2 keypoints in current image
      * @param prevDescr descriptors in previous image
      * @param currDescr descriptors in current image
      * @param good_matches output correspondence with Teaser
-     * @param m_points1 output matched keypoints in previous image
-     * @param m_points2 output matched keypoints in current image
-     * @param m_points1_transformed output matched keypoints transformed from previous image to current image
+     * @param m_points1 output matched keypoints in previous image. 1 to 1 correspondence with m_points2 and m_points1_transformed
+     * @param m_points2 output matched keypoints in current image. 1 to 1 correspondence with m_points1 and m_points1_transformed
+     * @param m_points1_transformed output matched keypoints transformed from previous image to current image. 1 to 1 correspondence with m_points1 and m_points2
      */
 
     bool estimate2DtfAnd2DPoints(const std::vector<cv::KeyPoint> &points1,
@@ -302,7 +338,10 @@ public:
                                  std::vector<cv::KeyPoint> &m_points1,
                                  std::vector<cv::KeyPoint> &m_points2,
                                  std::vector<cv::KeyPoint> &m_points1_transformed);
-
+    
+    bool estimate3DtfSVD(std::vector<Eigen::Vector3d> &m_points1_3D,
+                         std::vector<Eigen::Vector3d> &m_points2_3D);
+    
     /** @fn void imageCb(const sensor_msgs::ImageConstPtr &msg)
      * @brief image RGB callback
      */
@@ -356,12 +395,11 @@ public:
      *  @brief publish alredy constructed odometry path.
      */
     void publishOdomPath();
-    /** @fn void addTfToPath(const Eigen::MatrixXd &R_f, const Eigen::VectorXd &t_f)
-     *  @param R_f rotation matrix
-     *  @param t_f translation vector
+    /** @fn void addTfToPath(const Eigen::Matrix4d &R_f, const Eigen::VectorXd &t_f)
+     *  @param Matrix4d new tf     
      *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
      */
-    void addTfToPath(const Eigen::Affine3d &pose);
+    void addTfToPath(const Eigen::Matrix4d &pose);
     /** @fn void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
      *  @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
      */

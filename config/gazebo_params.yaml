@@ -1,6 +1,6 @@
 image_topic: "/cam0/image_raw"
 cam_info_topic: "/camera/depth/camera_info"
-useDepth: false #if true specify a valid depth topic
+useDepth: true #if true specify a valid depth topic
 depth_topic: "/depth0/image_raw"
 benchmark_3D: false  #will compute 3D Keypoint Error / needs depth
 output_path: "/tmp"

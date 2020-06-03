@@ -3,19 +3,20 @@
 
 #include <eigen3/Eigen/Dense>
 
-Eigen::Matrix4d T_B_P;
+// Eigen::Matrix4d T_B_P;
 
-inline Eigen::Affine3d fromVisionCord(const Eigen::Affine3d &pose)
+inline Eigen::Matrix4d fromVisionCord(const Eigen::Matrix4d &pose)
 {
-    T_B_P << 0,-1,  0 ,0, 
-             0, 0, -1, 0, 
-             1, 0,  0, 0, 
-             0, 0,  0, 1;
+   Eigen::Matrix4d T_B_P;
+   T_B_P << 0,-1,  0 ,0, 
+            0, 0, -1, 0, 
+            1, 0,  0, 0, 
+            0, 0,  0, 1;
              
     Eigen::Matrix4d invT_B_P=T_B_P.inverse();
     
-    Eigen::Affine3d ret;
-    ret.matrix() = invT_B_P*pose*T_B_P;
+    Eigen::Matrix4d ret;
+    ret = invT_B_P*pose*T_B_P;
     return ret;
 } 
 

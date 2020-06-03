@@ -2,7 +2,7 @@ image_topic: "/d400/color/image_raw"
 cam_info_topic: "/d400/aligned_depth_to_color/camera_info"
 useDepth: true #if true specify a valid depth topic
 depth_topic: "/d400/aligned_depth_to_color/image_raw"
-benchmark_3D: true  #will compute 3D Keypoint Error / needs depth
+benchmark_3D: false  #will compute 3D Keypoint Error / needs depth
 output_path: "/tmp"
 mm_to_meters: true
 publish_matches: true
