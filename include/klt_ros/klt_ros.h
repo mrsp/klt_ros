@@ -87,11 +87,11 @@ class klt_ros
     int MIN_NUM_FEAT;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
     cv::Mat currImage, prevImage, currImageRGB, prevDepthImage, currDepthImage;
-    cv::Mat R_f, t_f, R, R_2D, t_2D, t, E; //
+    cv::Mat  R, R_2D, t_2D, t, E; //
     ///Eigen 3D Rotation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
-    Eigen::MatrixXd Rot_eig;
+    Eigen::MatrixXd Rot_eig, R_f;
     ///Eigen 3D Translation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
-    Eigen::VectorXd t_eig;
+    Eigen::VectorXd t_eig, t_f;
     ///Teaser optimization parameters
     teaser::RobustRegistrationSolver::Params tparams;
     ///Teaser optimization solver
@@ -112,11 +112,13 @@ class klt_ros
     //odometry path publisher
     ros::Publisher odom_path_pub;
     //current pose from vo
-    Eigen::Matrix4d curr_pose;
+    Eigen::Affine3d curr_pose;
     //publish matches image
     ros::Publisher matches_pub;
     //ransac reprojection threshold
     double ransacReprojThreshold;
+    //absolute scale of the world
+    double scale;
 public:
     /** @fn  klt_ros(ros::NodeHandle nh_);
 	 *  @brief Initializes the VO Benchmarking
@@ -399,7 +401,7 @@ public:
      *  @param Matrix4d new tf     
      *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
      */
-    void addTfToPath(const Eigen::Matrix4d &pose);
+    void addTfToPath(const Eigen::Affine3d &pose);
     /** @fn void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
      *  @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
      */
@@ -468,5 +470,7 @@ public:
                     std::vector<cv::DMatch> &good_matches);
 
     std::vector<cv::Point2f> getPointsfromKeyPoints(const std::vector<cv::KeyPoint> Keypoints);
+    double estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevPoints_3D, std::vector<Eigen::Vector3d> matched_currPoints_3D, 
+                                 Eigen::MatrixXd Rotation, Eigen::VectorXd Translation);
 
 };
