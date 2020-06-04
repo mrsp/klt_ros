@@ -466,4 +466,7 @@ public:
                     cv::Mat des1,
                     cv::Mat des2,
                     std::vector<cv::DMatch> &good_matches);
+
+    std::vector<cv::Point2f> getPointsfromKeyPoints(const std::vector<cv::KeyPoint> Keypoints);
+
 };

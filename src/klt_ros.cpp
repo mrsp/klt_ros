@@ -607,6 +607,17 @@ void klt_ros::transform2DKeyPoints(const std::vector<cv::KeyPoint> Keypoints,
 
 }
 
+std::vector<cv::Point2f> klt_ros::getPointsfromKeyPoints(const std::vector<cv::KeyPoint> Keypoints)
+{
+    std::vector<cv::Point2f> points;
+    points.resize(Keypoints.size());
+    for (int i = 0; i < Keypoints.size(); i++)
+    {
+        points[i] = Keypoints[i].pt;
+    }
+    return points;
+}
+
 void klt_ros::filterPoints(const std::vector<cv::KeyPoint> &Keypoints1,
                            const std::vector<cv::KeyPoint> &Keypoints2,
                            const std::vector<cv::DMatch> &initial_matches,
@@ -791,6 +802,7 @@ void klt_ros::vo()
         trackFeatures();
         cv::Mat mask;
         //Compute Essential Matrix with the Nister Alogirthm
+
         E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::RANSAC, 0.999, 1.0, mask);
         cv::recoverPose(E, currFeatures, prevFeatures, R, t, fx, pp, mask);
         //std::cout << " Rel Vo" << R << " " << t << std::endl;
