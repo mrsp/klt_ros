@@ -41,6 +41,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     Rot_eig.setIdentity();
     t_eig.resize(3);
     t_eig.setZero();
+    cam_intrinsics = cv::Mat::zeros(3,3,CV_64F);
     ros::NodeHandle n_p("~");
 
     ransacReprojThreshold = 5;
@@ -163,11 +164,17 @@ void klt_ros::cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg)
 
         fx = msg->K[0];
         cx = msg->K[2];
-        fy = msg->K[5];
-        cy = msg->K[6];
+        fy = msg->K[4];
+        cy = msg->K[5];
 
         pp.x = cx;
         pp.y = cy;
+        cam_intrinsics.at<double>(0,0) = fx;
+        cam_intrinsics.at<double>(0,2) = cx;
+        cam_intrinsics.at<double>(1,1) = fx;
+        cam_intrinsics.at<double>(1,2) = cy;
+        cam_intrinsics.at<double>(2,2) = 1;
+        cout<<"Cam Int"<<cam_intrinsics<<std::endl;
         firstCameraInfoCb = false;
     }
 }
@@ -302,16 +309,16 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p2 = m_points2_tmp[i];
         cv::KeyPoint pt = m_points1_trans_tmp[i];
 
-        int x1 = cv::cvRound(p1.pt.y);
-        int y1 = cv::cvRound(p1.pt.x);
+        int x1 = cvRound(p1.pt.y);
+        int y1 = cvRound(p1.pt.x);
         float d1 = prevDepthImage.at<float>(x1, y1);
 
-        int x2 = cv::cvRound(p2.pt.y);
-        int y2 = cv::cvRound(p2.pt.x);
+        int x2 = cvRound(p2.pt.y);
+        int y2 = cvRound(p2.pt.x);
         float d2 = currDepthImage.at<float>(x2, y2);
 
-        int xt = cv::cvRound(pt.pt.y);
-        int yt = cv::cvRound(pt.pt.x);
+        int xt = cvRound(pt.pt.y);
+        int yt = cvRound(pt.pt.x);
         float dt = prevDepthImage.at<float>(xt, yt);
 
         // some near plane constraint and NaN elimination
@@ -440,12 +447,12 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p2 = points2[tidx];
 
         //         //current key points
-        int x1 = cv::cvRound(p1.pt.y);
-        int y1 = cv::cvRound(p1.pt.x);
+        int x1 = cvRound(p1.pt.y);
+        int y1 = cvRound(p1.pt.x);
         float d1 = prevDepthImage.at<float>(x1, y1);
 
-        int x2 = cv::cvRound(p2.pt.y);
-        int y2 = cv::cvRound(p2.pt.x);
+        int x2 = cvRound(p2.pt.y);
+        int y2 = cvRound(p2.pt.x);
         float d2 = currDepthImage.at<float>(x2, y2);
 
         // Near plane constraint and NaN elimination
@@ -508,12 +515,12 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p1 = points1[qidx];
         cv::KeyPoint p2 = points2[tidx];
         //current key points
-        int x1 = cv::cvRound(p1.pt.y);
-        int y1 = cv::cvRound(p1.pt.x);
+        int x1 = cvRound(p1.pt.y);
+        int y1 = cvRound(p1.pt.x);
         float d1 = prevDepthImage.at<float>(x1, y1);
 
-        int x2 = cv::cvRound(p2.pt.y);
-        int y2 = cv::cvRound(p2.pt.x);
+        int x2 = cvRound(p2.pt.y);
+        int y2 = cvRound(p2.pt.x);
         float d2 = currDepthImage.at<float>(x2, y2);
         Eigen::Vector3d v1((x1 - cx) * d1 / fx,
                            (y1 - cy) * d1 / fy,
@@ -805,12 +812,11 @@ void klt_ros::vo()
         currFeatures.clear();
         featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
         cv::Mat mask;
-
         //Compute Essential Matrix with the Nister Alogirthm
-        //E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::RANSAC, 0.999, 1.0, mask);
-        E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::LMEDS);
+        E = cv::findEssentialMat(currFeatures, prevFeatures, cam_intrinsics, cv::RANSAC, 0.999, 1.0, mask);
+        //E = cv::findEssentialMat(currFeatures, prevFeatures, cam_intrinsics, cv::LMEDS);
 
-        cv::recoverPose(E, currFeatures, prevFeatures, R, t, fx, pp, mask);
+        cv::recoverPose(E, currFeatures, prevFeatures, cam_intrinsics, R, t, mask);
 
         for (int i = 0; i < 3; i++)
         {
@@ -830,12 +836,12 @@ void klt_ros::vo()
 
         for (int i = 0; i < currFeatures.size(); i++)
         {
-            int x1 = cv::cvRound(prevFeatures[i].y);
-            int y1 = cv::cvRound(prevFeatures[i].x);
+            int x1 = cvRound(prevFeatures[i].y);
+            int y1 = cvRound(prevFeatures[i].x);
             float d1 = prevDepthImage.at<float>(x1, y1);
 
-            int x2 = cv::cvRound(currFeatures[i].y);
-            int y2 = cv::cvRound(currFeatures[i].x);
+            int x2 = cvRound(currFeatures[i].y);
+            int y2 = cvRound(currFeatures[i].x);
             float d2 = currDepthImage.at<float>(x2, y2);
             if (d1 < 0.0001f || d2 < 0.0001f || d1 != d1 || d2 != d2)
             {
@@ -924,7 +930,9 @@ void klt_ros::vo()
         show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
     }
 
-    if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
+    //if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
+    if ((scale > 0.01) && (scale <= 1.2))
+
     {
         t_f = t_f + scale * R_f * t_eig;
         R_f = Rot_eig * R_f;
@@ -1274,4 +1282,4 @@ double klt_ros::estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevP
 
     lambda =  error.norm() / Translation.norm();
     return lambda;
-+}
+}

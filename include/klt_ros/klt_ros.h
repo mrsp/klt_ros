@@ -87,7 +87,7 @@ class klt_ros
     int MIN_NUM_FEAT;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
     cv::Mat currImage, prevImage, currImageRGB, prevDepthImage, currDepthImage;
-    cv::Mat  R, R_2D, t_2D, t, E; //
+    cv::Mat  R, R_2D, t_2D, t, E, cam_intrinsics; //
     ///Eigen 3D Rotation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
     Eigen::MatrixXd Rot_eig, R_f;
     ///Eigen 3D Translation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)

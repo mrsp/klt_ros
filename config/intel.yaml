@@ -9,4 +9,4 @@ publish_matches: true
 image_freq: 30
 
 
-trackFeatures: true
+trackFeatures: false
