@@ -806,7 +806,9 @@ void klt_ros::vo()
         cv::Mat mask;
 
         //Compute Essential Matrix with the Nister Alogirthm
-        E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::RANSAC, 0.999, 1.0, mask);
+        //E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::RANSAC, 0.999, 1.0, mask);
+        E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::LMEDS);
+
         cv::recoverPose(E, currFeatures, prevFeatures, R, t, fx, pp, mask);
 
         for (int i = 0; i < 3; i++)
@@ -834,24 +836,23 @@ void klt_ros::vo()
             int x2 = currFeatures[i].y + 0.5f;
             int y2 = currFeatures[i].x + 0.5f;
             float d2 = currDepthImage.at<float>(x2, y2);
-
             if (d1 < 0.0001f || d2 < 0.0001f || d1 != d1 || d2 != d2)
             {
                 continue;
             }
-            Eigen::Vector3d v1((x1 - cx) * d1 / fx,
-                               (y1 - cy) * d1 / fy,
+            Eigen::Vector3d v1(( (float) x1 - cx) * d1 / fx,
+                               ( (float) y1 - cy) * d1 / fy,
                                d1);
 
-            Eigen::Vector3d v2((x2 - cx) * d2 / fx,
-                               (y2 - cy) * d2 / fy,
+            Eigen::Vector3d v2(( (float) x2 - cx) * d2 / fx,
+                               ( (float) y2 - cy) * d2 / fy,
                                d2);
             matched_prevPoints_3D.push_back(v1);
             matched_currPoints_3D.push_back(v2);
         }
-
+        std::cout << " match size "<<matched_prevPoints_3D.size()<<std::endl;
         scale = estimateAbsoluteScale(matched_prevPoints_3D, matched_currPoints_3D, Rot_eig, t_eig);
-        std::cout << " Rel Vo" << R << " " << t << " Scale is " << scale << std::endl;
+        std::cout << " Rel Vo" << Rot_eig << " " << t_eig << " Scale is " << scale << std::endl;
     }
     else
     {
@@ -1258,12 +1259,13 @@ double klt_ros::estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevP
     for (int i = 0; i < matched_prevPoints_3D.size(); i++)
     {
         tempV = Rotation * matched_prevPoints_3D[i] + Translation;
-        error(0) += matched_currPoints_3D[i](0) - tempV(0);
-        error(1) += matched_currPoints_3D[i](1) - tempV(1);
-        error(2) += matched_currPoints_3D[i](2) - tempV(2);
+        error(0) +=  (matched_currPoints_3D[i](0) - tempV(0));
+        error(1) +=  (matched_currPoints_3D[i](1) - tempV(1));
+        error(2) +=  (matched_currPoints_3D[i](2) - tempV(2));
     }
+ 
 
-    lambda = sqrt(error.norm()) / matched_prevPoints_3D.size();
+    lambda =  sqrt(error.norm())/matched_prevPoints_3D.size();
 
     return lambda;
 }
