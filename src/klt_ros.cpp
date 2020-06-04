@@ -799,14 +799,21 @@ void klt_ros::vo()
     
     if (trackOn)
     {
-        trackFeatures();
+        //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
+        if (prevKeypoints.size() < MIN_NUM_FEAT)
+        {
+            ROS_INFO("trigerring redection");
+            siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+        }
+        prevFeatures = getPointsfromKeyPoints(prevKeypoints);
+        currFeatures.clear();
+        featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
         cv::Mat mask;
-        //Compute Essential Matrix with the Nister Alogirthm
 
+        //Compute Essential Matrix with the Nister Alogirthm
         E = cv::findEssentialMat(currFeatures, prevFeatures, fx, pp, cv::RANSAC, 0.999, 1.0, mask);
         cv::recoverPose(E, currFeatures, prevFeatures, R, t, fx, pp, mask);
-        //std::cout << " Rel Vo" << R << " " << t << std::endl;
-        
+        std::cout << " Rel Vo" << R << " " << t << std::endl;
     }
     else
     {
@@ -914,10 +921,6 @@ void klt_ros::vo()
 
     std::swap(prevKeypoints, currKeypoints);
     std::swap(prevDescr, currDescr);
-
-    std::cout << "VO" << std::endl;
-    std::cout << Rot_eig << std::endl;
-    std::cout << t_eig << std::endl;
     img_inc = false;        
 }
 
@@ -1224,17 +1227,4 @@ void klt_ros::teaserParams3DTFEstimation()
     tparams.rotation_cost_threshold = 0.005;
 
     
-}
-
-void klt_ros::trackFeatures()
-{
-
-    //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
-    if (prevFeatures.size() < MIN_NUM_FEAT)
-    {
-        //cout << "Number of tracked features reduced to " << prevFeatures.size() << endl;
-        //cout << "trigerring redection" << endl;
-        featureDetection(prevImage, prevFeatures);
-    }
-    featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
 }
