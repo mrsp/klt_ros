@@ -26,7 +26,6 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     firstCameraInfoCb = true;
     MIN_NUM_FEAT = 10;
 
-    trackOn = true;
     voInitialized = false;
 
     frame = 0;
@@ -49,6 +48,8 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
 
     n_p.param<std::string>("image_topic", image_topic, "/camera/rgb/image_rect_color");
     n_p.param<bool>("useDepth", useDepth, true);
+    n_p.param<bool>("trackFeatures", trackOn, false);
+
     n_p.param<std::string>("depth_topic", depth_topic, "/camera/depth_registered/sw_registered/image_rect");
     n_p.param<std::string>("cam_info_topic", cam_info_topic, "/camera/rgb/camera_info");
     n_p.param<bool>("benchmark_3D", benchmark_3D, true);
@@ -342,13 +343,13 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
     }
 
     estimate3DtfSVD(m_points1_3D, m_points2_3D);
+   
     return true;
 }
 
 bool klt_ros::estimate3DtfSVD(std::vector<Eigen::Vector3d> &m_points1_3D,
                               std::vector<Eigen::Vector3d> &m_points2_3D)
 {
-    std::cout << "estimate3DtfSVD" << std::endl;
 
     Eigen::MatrixXd point_mat1(m_points1_3D.size(), 3);
     Eigen::MatrixXd point_mat2(m_points2_3D.size(), 3);
@@ -529,6 +530,9 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
 
     //Transform the 3D points of Image 1 to the 3D Space with the Teaser Affine Transformation
     m_points1_transformed_3D = transform3DKeyPoints(m_points1_3D, Rot_eig, t_eig);
+
+     scale = estimateAbsoluteScale(m_points1_3D, m_points2_3D, Rot_eig, t_eig);
+    std::cout<<"Scale is "<<scale<<std::endl;
     return true;
 }
 std::vector<Eigen::Vector3d> klt_ros::transform3DKeyPoints(const std::vector<Eigen::Vector3d> Keypoints, Eigen::MatrixXd Rotation, Eigen::VectorXd Translation)
@@ -682,10 +686,7 @@ bool klt_ros::estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynam
     std::cout << "Fitness:" << fitness << std::endl;
     std::cout << "Inliners size:" << inliners.size() << std::endl;
 
-    std::cout << "ROT:\n"
-              << Rot_eig << std::endl;
-    std::cout << "TR:\n"
-              << t_eig << std::endl;
+
 
     if (inliners.size() < MIN_NUM_FEAT)
         return false;
@@ -1256,16 +1257,21 @@ double klt_ros::estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevP
     error.setZero();
     tempV.resize(3);
     tempV.setZero();
+
+    int size = matched_prevPoints_3D.size();
+    //int size = 1;
     for (int i = 0; i < matched_prevPoints_3D.size(); i++)
     {
-        tempV = Rotation * matched_prevPoints_3D[i] + Translation;
+        tempV = Rotation * matched_prevPoints_3D[i];
         error(0) +=  (matched_currPoints_3D[i](0) - tempV(0));
         error(1) +=  (matched_currPoints_3D[i](1) - tempV(1));
         error(2) +=  (matched_currPoints_3D[i](2) - tempV(2));
+
+
+
     }
- 
+    error /= size;
 
-    lambda =  sqrt(error.norm())/matched_prevPoints_3D.size();
-
+    lambda =  error.norm() / Translation.norm();
     return lambda;
 }
