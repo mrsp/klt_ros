@@ -302,16 +302,16 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p2 = m_points2_tmp[i];
         cv::KeyPoint pt = m_points1_trans_tmp[i];
 
-        int x1 = p1.pt.y + 0.5f;
-        int y1 = p1.pt.x + 0.5f;
+        int x1 = cv::cvRound(p1.pt.y);
+        int y1 = cv::cvRound(p1.pt.x);
         float d1 = prevDepthImage.at<float>(x1, y1);
 
-        int x2 = p2.pt.y + 0.5f;
-        int y2 = p2.pt.x + 0.5f;
+        int x2 = cv::cvRound(p2.pt.y);
+        int y2 = cv::cvRound(p2.pt.x);
         float d2 = currDepthImage.at<float>(x2, y2);
 
-        int xt = p1.pt.y + 0.5f;
-        int yt = p1.pt.x + 0.5f;
+        int xt = cv::cvRound(pt.pt.y);
+        int yt = cv::cvRound(pt.pt.x);
         float dt = prevDepthImage.at<float>(xt, yt);
 
         // some near plane constraint and NaN elimination
@@ -440,12 +440,12 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p2 = points2[tidx];
 
         //         //current key points
-        int x1 = p1.pt.y + 0.5f;
-        int y1 = p1.pt.x + 0.5f;
+        int x1 = cv::cvRound(p1.pt.y);
+        int y1 = cv::cvRound(p1.pt.x);
         float d1 = prevDepthImage.at<float>(x1, y1);
 
-        int x2 = p2.pt.y + 0.5f;
-        int y2 = p2.pt.x + 0.5f;
+        int x2 = cv::cvRound(p2.pt.y);
+        int y2 = cv::cvRound(p2.pt.x);
         float d2 = currDepthImage.at<float>(x2, y2);
 
         // Near plane constraint and NaN elimination
@@ -508,12 +508,12 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
         cv::KeyPoint p1 = points1[qidx];
         cv::KeyPoint p2 = points2[tidx];
         //current key points
-        int x1 = p1.pt.y + 0.5f;
-        int y1 = p1.pt.x + 0.5f;
+        int x1 = cv::cvRound(p1.pt.y);
+        int y1 = cv::cvRound(p1.pt.x);
         float d1 = prevDepthImage.at<float>(x1, y1);
 
-        int x2 = p2.pt.y + 0.5f;
-        int y2 = p2.pt.x + 0.5f;
+        int x2 = cv::cvRound(p2.pt.y);
+        int y2 = cv::cvRound(p2.pt.x);
         float d2 = currDepthImage.at<float>(x2, y2);
         Eigen::Vector3d v1((x1 - cx) * d1 / fx,
                            (y1 - cy) * d1 / fy,
@@ -830,12 +830,12 @@ void klt_ros::vo()
 
         for (int i = 0; i < currFeatures.size(); i++)
         {
-            int x1 = prevFeatures[i].y + 0.5f;
-            int y1 = prevFeatures[i].x + 0.5f;
+            int x1 = cv::cvRound(prevFeatures[i].y);
+            int y1 = cv::cvRound(prevFeatures[i].x);
             float d1 = prevDepthImage.at<float>(x1, y1);
 
-            int x2 = currFeatures[i].y + 0.5f;
-            int y2 = currFeatures[i].x + 0.5f;
+            int x2 = cv::cvRound(currFeatures[i].y);
+            int y2 = cv::cvRound(currFeatures[i].x);
             float d2 = currDepthImage.at<float>(x2, y2);
             if (d1 < 0.0001f || d2 < 0.0001f || d1 != d1 || d2 != d2)
             {
@@ -1274,4 +1274,4 @@ double klt_ros::estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevP
 
     lambda =  error.norm() / Translation.norm();
     return lambda;
-}
++}
