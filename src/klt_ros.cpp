@@ -2,9 +2,6 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <Eigen/Geometry>
 
-#define PUB_ODOM_PATH_TOPIC "/klt_ros/odomPath"
-#define PUB_MATCHES_TOPIC "/klt_ros/img/matches"
-
 #include <klt_ros/utils.h>
 
 //opencv
@@ -29,7 +26,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     voInitialized = false;
 
     frame = 0;
-    R_f.resize(3,3);
+    R_f.resize(3, 3);
     R_f.setIdentity();
     t_f.resize(3);
     t_f.setZero();
@@ -41,10 +38,10 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     Rot_eig.setIdentity();
     t_eig.resize(3);
     t_eig.setZero();
-    cam_intrinsics = cv::Mat::zeros(3,3,CV_64F);
+    cam_intrinsics = cv::Mat::zeros(3, 3, CV_64F);
     ros::NodeHandle n_p("~");
 
-    ransacReprojThreshold = 5;
+    ransacReprojThreshold = 10;
     curr_pose = Eigen::Affine3d::Identity();
 
     n_p.param<std::string>("image_topic", image_topic, "/camera/rgb/image_rect_color");
@@ -59,7 +56,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     n_p.param<bool>("publish_matches", publish_matches, false);
 
     if (publish_matches)
-        matches_pub = n_p.advertise<sensor_msgs::Image>(PUB_MATCHES_TOPIC, 100);
+        matches_pub = n_p.advertise<sensor_msgs::Image>("klt_ros/img/matches", 100);
 
     if (useDepth)
     {
@@ -70,7 +67,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
 
         ts_sync->registerCallback(boost::bind(&klt_ros::imageDepthCb, this, _1, _2));
 
-        odom_path_pub = n_p.advertise<nav_msgs::Path>(PUB_ODOM_PATH_TOPIC, 50);
+        odom_path_pub = n_p.advertise<nav_msgs::Path>("klt_ros/odom/path", 50);
     }
     else
         image_sub_ = it.subscribe(image_topic, 1, &klt_ros::imageCb, this);
@@ -86,6 +83,166 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
         }
     }
 }
+
+//Main Function void vo()
+void klt_ros::vo()
+{
+    bool matched = false;
+    scale = 1.0;
+    if (!img_inc || !voInitialized)
+        return;
+
+    //Detect Features occasionally and track them frame-by-frame
+    if (trackOn)
+    {
+        //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
+        if (prevKeypoints.size() < MIN_NUM_FEAT)
+        {
+            ROS_INFO("trigerring redection");
+            siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+        }
+        prevFeatures = getPointsfromKeyPoints(prevKeypoints);
+        currFeatures.clear();
+        featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
+        cv::Mat mask;
+        //Compute Essential Matrix with the Nister Alogirthm
+        E = cv::findEssentialMat(currFeatures, prevFeatures, cam_intrinsics, cv::RANSAC, 0.999, 1.0, mask);
+        //E = cv::findEssentialMat(currFeatures, prevFeatures, cam_intrinsics, cv::LMEDS);
+
+        cv::recoverPose(E, currFeatures, prevFeatures, cam_intrinsics, R, t, mask);
+
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                Rot_eig(i, j) = R.at<double>(i, j);
+            }
+        }
+
+        t_eig(0) = t.at<double>(0);
+        t_eig(1) = t.at<double>(1);
+        t_eig(2) = t.at<double>(2);
+        std::vector<Eigen::Vector3d> matched_prevPoints_3D;
+        std::vector<Eigen::Vector3d> matched_currPoints_3D;
+        matched_prevPoints_3D.reserve(currFeatures.size());
+        matched_currPoints_3D.reserve(currFeatures.size());
+
+        for (int i = 0; i < currFeatures.size(); i++)
+        {
+            int x1 = cvRound(prevFeatures[i].y);
+            int y1 = cvRound(prevFeatures[i].x);
+            float d1 = prevDepthImage.at<float>(x1, y1);
+
+            int x2 = cvRound(currFeatures[i].y);
+            int y2 = cvRound(currFeatures[i].x);
+            float d2 = currDepthImage.at<float>(x2, y2);
+            if (d1 < 0.0001f || d2 < 0.0001f || d1 != d1 || d2 != d2)
+            {
+                continue;
+            }
+            Eigen::Vector3d v1(((float)x1 - cx) * d1 / fx,
+                               ((float)y1 - cy) * d1 / fy,
+                               d1);
+
+            Eigen::Vector3d v2(((float)x2 - cx) * d2 / fx,
+                               ((float)y2 - cy) * d2 / fy,
+                               d2);
+            matched_prevPoints_3D.push_back(v1);
+            matched_currPoints_3D.push_back(v2);
+        }
+        std::cout << " match size " << matched_prevPoints_3D.size() << std::endl;
+        scale = estimateAbsoluteScale(matched_prevPoints_3D, matched_currPoints_3D, Rot_eig, t_eig);
+        std::cout << " Rel Vo" << Rot_eig << " " << t_eig << " Scale is " << scale << std::endl;
+    }
+    else //Or Detect features and match them frame-by-frame
+    {
+        std::vector<cv::DMatch> good_matches;
+        std::vector<cv::KeyPoint> matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
+        cv::Mat matched_prevDescr, matched_currDescr;
+
+        if (!useDepth) //If no depth information is available do 2D detection
+        {
+            siftFeatureDetection(currImage, currKeypoints, currDescr);
+            matched = estimate2DtfAnd2DPoints(prevKeypoints, currKeypoints,
+                                              prevDescr, currDescr,
+                                              good_matches,
+                                              matched_prevKeypoints, matched_currKeypoints,
+                                              matched_prevKeypoints_transformed);
+            if (matched)
+            {
+                plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
+                computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
+            }
+        }
+        else //Otherwise, compute 3D matches
+        {
+            siftFeatureDetection(currImage, currKeypoints, currDescr, currDepthImage);
+            std::vector<Eigen::Vector3d> matched_prevPoints_3D;
+            std::vector<Eigen::Vector3d> matched_currPoints_3D;
+            std::vector<Eigen::Vector3d> matched_prevPoints_transformed_3D;
+
+            if (benchmark_3D)
+            {
+                matched = estimate3Dtf(prevKeypoints, currKeypoints,
+                                       prevDescr, currDescr,
+                                       good_matches,
+                                       matched_prevKeypoints, matched_currKeypoints,
+                                       matched_prevPoints_3D, matched_currPoints_3D,
+                                       matched_prevPoints_transformed_3D);
+                if (!matched)
+                    return;
+            }
+            else
+            {
+                matched = estimate2DtfAnd3DPoints(prevKeypoints, currKeypoints,
+                                                  prevDescr, currDescr,
+                                                  good_matches,
+                                                  matched_prevKeypoints, matched_currKeypoints,
+                                                  matched_prevKeypoints_transformed,
+                                                  matched_prevPoints_3D, matched_currPoints_3D,
+                                                  matched_prevPoints_transformed_3D);
+
+                if (!matched)
+                    return;
+
+                computeTransformedKeypoints3DError(matched_currPoints_3D, matched_prevPoints_transformed_3D);
+            }
+        }
+
+        //Publish Matches to a ros image
+        if (publish_matches)
+            publishMatches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
+
+        //Write Matches to a file image
+        show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
+    }
+
+    //Compute Visual Odometry
+    //if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
+    if ((scale > 0.01) && (scale <= 1.2))
+
+    {
+        t_f = t_f + scale * R_f * t_eig;
+        R_f = Rot_eig * R_f;
+        curr_pose.translation() = t_f;
+        curr_pose.linear() = R_f;
+    }
+
+    //Add Visual Odometry to a Path for Plotting in rviz
+    addTfToPath(curr_pose);
+    ROS_INFO("Visual Odometry");
+    std::cout << "Translation " << t_f << std::endl;
+    std::cout << "Rotation " << R_f << std::endl;
+
+    prevImage = currImage.clone();
+    prevDepthImage = currDepthImage.clone();
+
+    std::swap(prevKeypoints, currKeypoints);
+    std::swap(prevDescr, currDescr);
+    img_inc = false;
+}
+
+
 
 void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sensor_msgs::ImageConstPtr &depth_msg)
 {
@@ -169,12 +326,12 @@ void klt_ros::cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg)
 
         pp.x = cx;
         pp.y = cy;
-        cam_intrinsics.at<double>(0,0) = fx;
-        cam_intrinsics.at<double>(0,2) = cx;
-        cam_intrinsics.at<double>(1,1) = fx;
-        cam_intrinsics.at<double>(1,2) = cy;
-        cam_intrinsics.at<double>(2,2) = 1;
-        cout<<"Cam Int"<<cam_intrinsics<<std::endl;
+        cam_intrinsics.at<double>(0, 0) = fx;
+        cam_intrinsics.at<double>(0, 2) = cx;
+        cam_intrinsics.at<double>(1, 1) = fx;
+        cam_intrinsics.at<double>(1, 2) = cy;
+        cam_intrinsics.at<double>(2, 2) = 1;
+        cout << "Cam Int" << cam_intrinsics << std::endl;
         firstCameraInfoCb = false;
     }
 }
@@ -350,7 +507,7 @@ bool klt_ros::estimate2DtfAnd3DPoints(const std::vector<cv::KeyPoint> &points1,
     }
 
     estimate3DtfSVD(m_points1_3D, m_points2_3D);
-   
+
     return true;
 }
 
@@ -538,8 +695,8 @@ bool klt_ros::estimate3Dtf(const std::vector<cv::KeyPoint> &points1,
     //Transform the 3D points of Image 1 to the 3D Space with the Teaser Affine Transformation
     m_points1_transformed_3D = transform3DKeyPoints(m_points1_3D, Rot_eig, t_eig);
 
-     scale = estimateAbsoluteScale(m_points1_3D, m_points2_3D, Rot_eig, t_eig);
-    std::cout<<"Scale is "<<scale<<std::endl;
+    scale = estimateAbsoluteScale(m_points1_3D, m_points2_3D, Rot_eig, t_eig);
+    std::cout << "Scale is " << scale << std::endl;
     return true;
 }
 std::vector<Eigen::Vector3d> klt_ros::transform3DKeyPoints(const std::vector<Eigen::Vector3d> Keypoints, Eigen::MatrixXd Rotation, Eigen::VectorXd Translation)
@@ -646,7 +803,7 @@ void klt_ros::filterPoints(const std::vector<cv::KeyPoint> &Keypoints1,
         cv::Point2f diff(p1.x - p2.x,
                          p1.y - p2.y);
 
-        double l2sq = diff.x * diff.x + diff.y * diff.y;
+        double l2sq = (diff.x * diff.x + diff.y * diff.y);
         if (l2sq < thr_sq)
         {
             good_matches.push_back(m);
@@ -692,8 +849,6 @@ bool klt_ros::estimateAffineTFTeaser(const Eigen::Matrix<double, 3, Eigen::Dynam
     float fitness = (float)inliners.size() / (float)initial_matches.size();
     std::cout << "Fitness:" << fitness << std::endl;
     std::cout << "Inliners size:" << inliners.size() << std::endl;
-
-
 
     if (inliners.size() < MIN_NUM_FEAT)
         return false;
@@ -793,167 +948,6 @@ void klt_ros::siftFeatureDetection(const cv::Mat &img_1,
     sift->detectAndCompute(img_1, mask, points1, descriptors1);
 }
 
-void klt_ros::vo()
-{
-    bool matched = false;
-    scale = 1.0;
-    if (!img_inc || !voInitialized)
-        return;
-
-    if (trackOn)
-    {
-        //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
-        if (prevKeypoints.size() < MIN_NUM_FEAT)
-        {
-            ROS_INFO("trigerring redection");
-            siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
-        }
-        prevFeatures = getPointsfromKeyPoints(prevKeypoints);
-        currFeatures.clear();
-        featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
-        cv::Mat mask;
-        //Compute Essential Matrix with the Nister Alogirthm
-        E = cv::findEssentialMat(currFeatures, prevFeatures, cam_intrinsics, cv::RANSAC, 0.999, 1.0, mask);
-        //E = cv::findEssentialMat(currFeatures, prevFeatures, cam_intrinsics, cv::LMEDS);
-
-        cv::recoverPose(E, currFeatures, prevFeatures, cam_intrinsics, R, t, mask);
-
-        for (int i = 0; i < 3; i++)
-        {
-            for (int j = 0; j < 3; j++)
-            {
-                Rot_eig(i, j) = R.at<double>(i, j);
-            }
-        }
-
-        t_eig(0) = t.at<double>(0);
-        t_eig(1) = t.at<double>(1);
-        t_eig(2) = t.at<double>(2);
-        std::vector<Eigen::Vector3d> matched_prevPoints_3D;
-        std::vector<Eigen::Vector3d> matched_currPoints_3D;
-        matched_prevPoints_3D.reserve(currFeatures.size());
-        matched_currPoints_3D.reserve(currFeatures.size());
-
-        for (int i = 0; i < currFeatures.size(); i++)
-        {
-            int x1 = cvRound(prevFeatures[i].y);
-            int y1 = cvRound(prevFeatures[i].x);
-            float d1 = prevDepthImage.at<float>(x1, y1);
-
-            int x2 = cvRound(currFeatures[i].y);
-            int y2 = cvRound(currFeatures[i].x);
-            float d2 = currDepthImage.at<float>(x2, y2);
-            if (d1 < 0.0001f || d2 < 0.0001f || d1 != d1 || d2 != d2)
-            {
-                continue;
-            }
-            Eigen::Vector3d v1(( (float) x1 - cx) * d1 / fx,
-                               ( (float) y1 - cy) * d1 / fy,
-                               d1);
-
-            Eigen::Vector3d v2(( (float) x2 - cx) * d2 / fx,
-                               ( (float) y2 - cy) * d2 / fy,
-                               d2);
-            matched_prevPoints_3D.push_back(v1);
-            matched_currPoints_3D.push_back(v2);
-        }
-        std::cout << " match size "<<matched_prevPoints_3D.size()<<std::endl;
-        scale = estimateAbsoluteScale(matched_prevPoints_3D, matched_currPoints_3D, Rot_eig, t_eig);
-        std::cout << " Rel Vo" << Rot_eig << " " << t_eig << " Scale is " << scale << std::endl;
-    }
-    else
-    {
-        std::vector<cv::DMatch> good_matches;
-        std::vector<cv::KeyPoint> matched_currKeypoints, matched_prevKeypoints, matched_prevKeypoints_transformed;
-        cv::Mat matched_prevDescr, matched_currDescr;
-
-        if (!useDepth)
-        {
-            siftFeatureDetection(currImage, currKeypoints, currDescr);
-            matched = estimate2DtfAnd2DPoints(prevKeypoints, currKeypoints,
-                                              prevDescr, currDescr,
-                                              good_matches,
-                                              matched_prevKeypoints, matched_currKeypoints,
-                                              matched_prevKeypoints_transformed);
-            if (matched)
-            {
-                plotTransformedKeypoints(matched_currKeypoints, matched_prevKeypoints_transformed);
-                computeTransformedKeypointsError(matched_currKeypoints, matched_prevKeypoints_transformed);
-            }
-        }
-        else
-        {
-            siftFeatureDetection(currImage, currKeypoints, currDescr, currDepthImage);
-            std::vector<Eigen::Vector3d> matched_prevPoints_3D;
-            std::vector<Eigen::Vector3d> matched_currPoints_3D;
-            std::vector<Eigen::Vector3d> matched_prevPoints_transformed_3D;
-
-            if (benchmark_3D)
-            {
-                matched = estimate3Dtf(prevKeypoints, currKeypoints,
-                                       prevDescr, currDescr,
-                                       good_matches,
-                                       matched_prevKeypoints, matched_currKeypoints,
-                                       matched_prevPoints_3D, matched_currPoints_3D,
-                                       matched_prevPoints_transformed_3D);
-                if (!matched)
-                    return;
-
-                /*                Eigen::Affine3d delta;
-                delta.translation() = t_eig;
-                delta.linear() = Rot_eig;
-                delta=delta.inverse();
-                curr_pose = delta*curr_pose;
-                
-                addTfToPath(curr_pose);  */
-            }
-            else
-            {
-                matched = estimate2DtfAnd3DPoints(prevKeypoints, currKeypoints,
-                                                  prevDescr, currDescr,
-                                                  good_matches,
-                                                  matched_prevKeypoints, matched_currKeypoints,
-                                                  matched_prevKeypoints_transformed,
-                                                  matched_prevPoints_3D, matched_currPoints_3D,
-                                                  matched_prevPoints_transformed_3D);
-
-                if (!matched)
-                    return;
-
-                computeTransformedKeypoints3DError(matched_currPoints_3D, matched_prevPoints_transformed_3D);
-            }
-        }
-
-        if (publish_matches)
-            publishMatches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
-
-        show_matches(prevImage, currImage, prevKeypoints, currKeypoints, good_matches);
-    }
-
-    //if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
-    if ((scale > 0.01) && (scale <= 1.2))
-
-    {
-        t_f = t_f + scale * R_f * t_eig;
-        R_f = Rot_eig * R_f;
-        curr_pose.translation() = t_f;
-        curr_pose.linear() = R_f;
-    }
-    
-
-
-    addTfToPath(curr_pose);
-    ROS_INFO("Visual Odometry");
-    std::cout << "Translation " << t_f << std::endl;
-    std::cout << "Rotation " << R_f << std::endl;
-
-    prevImage = currImage.clone();
-    prevDepthImage = currDepthImage.clone();
-
-    std::swap(prevKeypoints, currKeypoints);
-    std::swap(prevDescr, currDescr);
-    img_inc = false;
-}
 
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
@@ -997,7 +991,6 @@ void klt_ros::publishMatches(const cv::Mat &img_1,
                              const std::vector<cv::KeyPoint> keypoints2,
                              const std::vector<cv::DMatch> &good_matches)
 {
-    static int counter = 0;
 
     if (good_matches.size() == 0)
         return;
@@ -1015,7 +1008,6 @@ void klt_ros::publishMatches(const cv::Mat &img_1,
     sensor_msgs::Image ros_msg;
 
     std_msgs::Header header;         // empty header
-    header.seq = counter;            // user defined counter
     header.stamp = ros::Time::now(); // time
 
     cv_bridge::CvImage img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img_matches);
@@ -1238,15 +1230,8 @@ void klt_ros::teaserParams2DTFEstimation()
 
 void klt_ros::teaserParams3DTFEstimation()
 {
-    //     tparams.noise_bound = 0.01;
-    //     tparams.cbar2 = 1;
-    //     tparams.estimate_scaling = false;
-    //     tparams.rotation_max_iterations = 100;
-    //     tparams.rotation_gnc_factor = 1.4;
-    //     tparams.rotation_estimation_algorithm = teaser::RobustRegistrationSolver::ROTATION_ESTIMATION_ALGORITHM::GNC_TLS;
-    //     tparams.rotation_cost_threshold = 0.005;
 
-    tparams.noise_bound = 0.05;
+    tparams.noise_bound = 0.02;
     tparams.cbar2 = 1;
     tparams.estimate_scaling = false;
     tparams.rotation_max_iterations = 100;
@@ -1267,19 +1252,15 @@ double klt_ros::estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevP
     tempV.setZero();
 
     int size = matched_prevPoints_3D.size();
-    //int size = 1;
     for (int i = 0; i < matched_prevPoints_3D.size(); i++)
     {
         tempV = Rotation * matched_prevPoints_3D[i];
-        error(0) +=  (matched_currPoints_3D[i](0) - tempV(0));
-        error(1) +=  (matched_currPoints_3D[i](1) - tempV(1));
-        error(2) +=  (matched_currPoints_3D[i](2) - tempV(2));
-
-
-
+        error(0) += (matched_currPoints_3D[i](0) - tempV(0));
+        error(1) += (matched_currPoints_3D[i](1) - tempV(1));
+        error(2) += (matched_currPoints_3D[i](2) - tempV(2));
     }
     error /= size;
 
-    lambda =  error.norm() / Translation.norm();
+    lambda = error.norm() / Translation.norm();
     return lambda;
 }
