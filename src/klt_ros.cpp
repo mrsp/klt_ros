@@ -16,12 +16,11 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
 {
 
     nh = nh_;
-    sift = cv::xfeatures2d::SIFT::create();
 
     img_inc = false;
     firstImageCb = true;
     firstCameraInfoCb = true;
-    MIN_NUM_FEAT = 10;
+    MIN_NUM_FEAT = 200;
 
     voInitialized = false;
 
@@ -41,7 +40,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     cam_intrinsics = cv::Mat::zeros(3, 3, CV_64F);
     ros::NodeHandle n_p("~");
 
-    ransacReprojThreshold = 10;
+    ransacReprojThreshold = 5;
     curr_pose = Eigen::Affine3d::Identity();
 
     n_p.param<std::string>("image_topic", image_topic, "/camera/rgb/image_rect_color");
@@ -54,6 +53,16 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     n_p.param<std::string>("output_path", output_path, "/tmp");
     n_p.param<bool>("mm_to_meters", mm_to_meters, false);
     n_p.param<bool>("publish_matches", publish_matches, false);
+    n_p.param<std::string>("feature_type", feature_type, "sift");
+
+    if(feature_type.compare("sift") == 0)
+        sift = cv::xfeatures2d::SIFT::create();
+    else if (feature_type.compare("surf") == 0)
+        sift = cv::xfeatures2d::SURF::create();
+    else if (feature_type.compare("brisk") == 0)
+        sift = cv::BRISK::create();
+    else if (feature_type.compare("orb") == 0)
+        sift = cv::ORB::create();
 
     if (publish_matches)
         matches_pub = n_p.advertise<sensor_msgs::Image>("klt_ros/img/matches", 100);
@@ -218,9 +227,8 @@ void klt_ros::vo()
     }
 
     //Compute Visual Odometry
-    //if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
-    if ((scale > 0.01) && (scale <= 1.2))
-
+    if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
+    //if ((scale > 0.01) && (scale <= 1.2))
     {
         t_f = t_f + scale * R_f * t_eig;
         R_f = Rot_eig * R_f;

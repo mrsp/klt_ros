@@ -8,3 +8,4 @@ mm_to_meters: false
 image_freq: 30
 publish_matches: true
 trackFeatures: true
+feature_type: "surf"

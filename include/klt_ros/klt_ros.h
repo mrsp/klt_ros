@@ -119,6 +119,7 @@ class klt_ros
     double ransacReprojThreshold;
     //absolute scale of the world
     double scale;
+    std::string feature_type;
 public:
     /** @fn  klt_ros(ros::NodeHandle nh_);
 	 *  @brief Initializes the VO Benchmarking
