@@ -4,7 +4,7 @@ useDepth: true #if true specify a valid depth topic
 depth_topic: "/camera/depth_registered/sw_registered/image_rect"
 benchmark_3D: true  #will compute 3D Keypoint Error / needs depth
 output_path: "/tmp"
-mm_to_meters: true
+mm_to_meters: false
 image_freq: 30
 publish_matches: true
 trackFeatures: true

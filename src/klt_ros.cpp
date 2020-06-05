@@ -280,7 +280,15 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
     if (firstImageCb)
     {
         //prevImage = cv_ptr->image;
-        cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
+        if(cv_ptr->image.channels() == 3)
+        {
+            cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
+        }
+        else
+        {
+            prevImage = cv_ptr->image;
+        }
+        
         prevDepthImage = cv_depth_ptr->image;
         if (useDepth)
         {
@@ -296,7 +304,14 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
     else
     {
         currImageRGB = cv_ptr->image;
-        cvtColor(cv_ptr->image, currImage, cv::COLOR_BGR2GRAY);
+        if(cv_ptr->image.channels() == 3)
+        {
+            cvtColor(cv_ptr->image, currImage, cv::COLOR_BGR2GRAY);
+        }
+        else
+        {
+            currImage = cv_ptr->image;
+        }
         currDepthImage = cv_depth_ptr->image;
         if (!voInitialized)
             voInitialized = true;
@@ -354,7 +369,15 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
     if (firstImageCb)
     {
         //prevImage = cv_ptr->image;
-        cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
+        if(cv_ptr->image.channels() == 3)
+        {
+            cvtColor(cv_ptr->image, prevImage, cv::COLOR_BGR2GRAY);
+        }
+        else
+        {
+            prevImage = cv_ptr->image;
+        }
+        
         siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
 
         firstImageCb = false;
@@ -362,7 +385,15 @@ void klt_ros::imageCb(const sensor_msgs::ImageConstPtr &msg)
     else
     {
         currImageRGB = cv_ptr->image;
-        cvtColor(cv_ptr->image, currImage, cv::COLOR_BGR2GRAY);
+        if(cv_ptr->image.channels() == 3)
+        {
+            cvtColor(cv_ptr->image, currImage, cv::COLOR_BGR2GRAY);
+        }
+        else
+        {
+           currImage = cv_ptr->image;
+        }
+        
         if (!voInitialized)
             voInitialized = true;
     }
