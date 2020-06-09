@@ -17,16 +17,11 @@ int main(int argc, char *argv[])
     klt_ros klt(n);
     ros::NodeHandle n_p("~");
     double image_freq;
-    n_p.param<double>("image_freq", image_freq, 100.0);
+    n_p.param<double>("image_freq", image_freq, 30.0);
     static ros::Rate rate(2.0*image_freq);
     while (ros::ok())
     {
         klt.vo();
-        
-        if(klt.isUsingDepth())
-        {
-            klt.publishOdomPath();
-        }
         ros::spinOnce();
         rate.sleep();
     }

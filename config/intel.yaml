@@ -7,7 +7,5 @@ output_path: "/tmp"
 mm_to_meters: true
 publish_matches: true
 image_freq: 30
-
 feature_type: "brisk" 
-
 trackFeatures: true

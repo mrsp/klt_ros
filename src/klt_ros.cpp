@@ -20,7 +20,7 @@ klt_ros::klt_ros(ros::NodeHandle nh_) : it(nh_)
     img_inc = false;
     firstImageCb = true;
     firstCameraInfoCb = true;
-    MIN_NUM_FEAT = 200;
+    MIN_NUM_FEAT = 100;
 
     voInitialized = false;
 
@@ -105,12 +105,13 @@ void klt_ros::vo()
     if (trackOn)
     {
         //a redetection is triggered in case the number of feautres being trakced go below a particular threshold
-        if (prevKeypoints.size() < MIN_NUM_FEAT)
+        if (prevFeatures.size() < MIN_NUM_FEAT)
         {
             ROS_INFO("trigerring redection");
-            siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+            //siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+            featureDetection(prevImage,prevFeatures);
         }
-        prevFeatures = getPointsfromKeyPoints(prevKeypoints);
+        //prevFeatures = getPointsfromKeyPoints(prevKeypoints);
         currFeatures.clear();
         featureTracking(prevImage, currImage, prevFeatures, currFeatures, status);
         cv::Mat mask;
@@ -162,6 +163,7 @@ void klt_ros::vo()
         std::cout << " match size " << matched_prevPoints_3D.size() << std::endl;
         scale = estimateAbsoluteScale(matched_prevPoints_3D, matched_currPoints_3D, Rot_eig, t_eig);
         std::cout << " Rel Vo" << Rot_eig << " " << t_eig << " Scale is " << scale << std::endl;
+        //plotFeatures();
     }
     else //Or Detect features and match them frame-by-frame
     {
@@ -241,10 +243,11 @@ void klt_ros::vo()
     ROS_INFO("Visual Odometry");
     std::cout << "Translation " << t_f << std::endl;
     std::cout << "Rotation " << R_f << std::endl;
+    publishOdomPath();
 
     prevImage = currImage.clone();
     prevDepthImage = currDepthImage.clone();
-
+    std::swap(prevFeatures, currFeatures);
     std::swap(prevKeypoints, currKeypoints);
     std::swap(prevDescr, currDescr);
     img_inc = false;
@@ -300,11 +303,21 @@ void klt_ros::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sens
         prevDepthImage = cv_depth_ptr->image;
         if (useDepth)
         {
-            siftFeatureDetection(prevImage, prevKeypoints, prevDescr, prevDepthImage);
+            if(trackOn)
+                featureDetection(prevImage,prevFeatures);
+            else
+                siftFeatureDetection(prevImage, prevKeypoints, prevDescr, prevDepthImage);
         }
         else
         {
-            siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+            if(trackOn)
+            {
+                featureDetection(prevImage,prevFeatures);
+            }
+            else
+            {
+                siftFeatureDetection(prevImage, prevKeypoints, prevDescr);
+            }
         }
 
         firstImageCb = false;
@@ -942,7 +955,7 @@ void klt_ros::featureDetection(cv::Mat img_1, std::vector<cv::Point2f> &points1)
         cv::KeyPoint::convert(keypoints_1, points1, std::vector<int>());
         */
 
-    int maxCorners = 500;
+    int maxCorners = 1000;
     double qualityLevel = 0.01;
     double minDistance = 10;
     int blockSize = 6;
@@ -1289,16 +1302,20 @@ double klt_ros::estimateAbsoluteScale(std::vector<Eigen::Vector3d> matched_prevP
     error.setZero();
     tempV.resize(3);
     tempV.setZero();
-
+    int s = 0;
     int size = matched_prevPoints_3D.size();
     for (int i = 0; i < matched_prevPoints_3D.size(); i++)
     {
         tempV = Rotation * matched_prevPoints_3D[i];
-        error(0) += (matched_currPoints_3D[i](0) - tempV(0));
-        error(1) += (matched_currPoints_3D[i](1) - tempV(1));
-        error(2) += (matched_currPoints_3D[i](2) - tempV(2));
+        if(fabs(matched_currPoints_3D[i](0) - tempV(0))<0.1 && fabs(matched_currPoints_3D[i](1) - tempV(1))<0.1 && fabs(matched_currPoints_3D[i](2) - tempV(2))<0.1)
+        {
+            error(0) += (matched_currPoints_3D[i](0) - tempV(0));
+            error(1) += (matched_currPoints_3D[i](1) - tempV(1));
+            error(2) += (matched_currPoints_3D[i](2) - tempV(2));
+            s++;
+        }
     }
-    error /= size;
+    error /= s;
 
     lambda = error.norm() / Translation.norm();
     return lambda;
